@@ -5,12 +5,15 @@ import (
 	"net/http"
 	"time"
 
+	audiov1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/config"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
 	router "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/http"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/rs/cors"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type App struct {
@@ -24,24 +27,24 @@ func New(
 	cfg *config.Config,
 	beatService core.BeatService,
 ) *App {
-	// creds, err := credentials.NewClientTLSFromFile(cfg.Cert, "")
-	// if err != nil {
-	// 	logger.Log().Fatal(ctx, "failed to create server TLS credentials: %v", err)
-	// }
+	creds, err := credentials.NewClientTLSFromFile(cfg.Cert, "")
+	if err != nil {
+		logger.Log().Fatal(ctx, "failed to create server TLS credentials: %v", err)
+	}
 
-	// conn, err := grpc.NewClient(cfg.GRPCPort, grpc.WithTransportCredentials(creds))
-	// if err != nil {
-	// 	logger.Log().Fatal(ctx, "failed to dial server:", err)
-	// }
+	conn, err := grpc.NewClient(cfg.GRPCPort, grpc.WithTransportCredentials(creds))
+	if err != nil {
+		logger.Log().Fatal(ctx, "failed to dial server:", err)
+	}
 
 	gwmux := runtime.NewServeMux()
 	router.NewRouter(gwmux, beatService, cfg.ChunkSize)
 
 	// Register user
-	// err = audiostreamingv1.RegisterAudioStreamingServiceServer(ctx, gwmux, conn)
-	// if err != nil {
-	// 	logger.Log().Fatal(ctx, "failed to register gateway: %w", err)
-	// }
+	err = audiov1.RegisterAudioServiceHandler(ctx, gwmux, conn)
+	if err != nil {
+		logger.Log().Fatal(ctx, "failed to register gateway: %w", err)
+	}
 
 	// Cors
 	withCors := cors.AllowAll().Handler(gwmux)

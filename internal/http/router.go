@@ -24,5 +24,5 @@ func NewRouter(app *runtime.ServeMux, beatService core.BeatService, chunkSize in
 }
 
 func (r *Router) initRoutes() {
-	r.app.HandlePath(http.MethodGet, "/v1/audio/{id}/stream", r.stream)
+	r.app.HandlePath(http.MethodGet, "/v1/audio/{id}", r.stream)
 }

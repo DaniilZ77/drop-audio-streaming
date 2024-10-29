@@ -7,7 +7,8 @@ import (
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/config"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
-	audiostreaming "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/grpc"
+	audio "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/grpc"
+	middleware "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/grpc"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
@@ -27,6 +28,10 @@ func New(
 	cfg *config.Config,
 	beatService core.BeatService,
 ) *App {
+	requireAuth := map[string]bool{
+		"/audio.AudioService/Upload": true,
+	}
+
 	opts := []grpc.ServerOption{}
 
 	// Logger
@@ -49,6 +54,7 @@ func New(
 	opts = append(opts, grpc.ChainUnaryInterceptor(
 		recovery.UnaryServerInterceptor(recoveryOpts...),
 		logging.UnaryServerInterceptor(interceptorLogger(logger.Log()), loggingOpts...),
+		middleware.EnsureValidToken(cfg.JWTSecret, requireAuth),
 	))
 
 	// TLS
@@ -63,7 +69,7 @@ func New(
 	gRPCServer := grpc.NewServer(opts...)
 
 	// Register services
-	audiostreaming.Register(gRPCServer)
+	audio.Register(gRPCServer, beatService)
 
 	return &App{
 		gRPCServer: gRPCServer,

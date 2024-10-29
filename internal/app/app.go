@@ -45,7 +45,7 @@ func New(ctx context.Context, cfg *config.Config) *App {
 	beatStore := beatstore.New(minio, pg, cfg.DB.MinioBucket)
 
 	// Service
-	beatService := beat.New(beatStore)
+	beatService := beat.New(beatStore, cfg.UploadURLTTL)
 
 	// gRPC server
 	gRPCApp := grpcapp.New(ctx, cfg, beatService)

@@ -33,7 +33,7 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 		return
 	}
 
-	beat, size, err := r.beatService.GetBeat(ctx, id, start, &end)
+	beat, size, contentType, err := r.beatService.GetBeat(ctx, id, start, &end)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatNotFound) {
@@ -45,7 +45,7 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 	}
 	defer beat.Close()
 
-	w.Header().Set("Content-Type", "audio/mpeg")
+	w.Header().Set("Content-Type", contentType)
 	if start != 0 || end != -1 {
 		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, size))
 		w.WriteHeader(http.StatusPartialContent)

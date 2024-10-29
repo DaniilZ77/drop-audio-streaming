@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/minio"
@@ -22,6 +23,9 @@ func New(m *minio.Minio, pg *postgres.Postgres, bucketName string) core.BeatStor
 }
 
 func (s *store) GetBeatByID(ctx context.Context, id int64) (*core.Beat, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
 	var beat core.Beat
 
 	stmt := `SELECT id, user_id, path, is_deleted, created_at, updated_at FROM beats WHERE id = $1`
@@ -36,14 +40,17 @@ func (s *store) GetBeatByID(ctx context.Context, id int64) (*core.Beat, error) {
 	return &beat, nil
 }
 
-func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int64, end *int64) (*miniolib.Object, int64, error) {
+func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int64, end *int64) (*miniolib.Object, int64, string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
 	objInfo, err := s.Client.StatObject(ctx, s.bucketName, beatPath, miniolib.StatObjectOptions{})
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "", err
 	}
 
 	if start >= objInfo.Size {
-		return nil, 0, core.ErrInvalidRange
+		return nil, 0, "", core.ErrInvalidRange
 	}
 
 	if *end >= objInfo.Size {
@@ -57,8 +64,33 @@ func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int64,
 
 	obj, err := s.Client.GetObject(ctx, s.bucketName, beatPath, opts)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "", err
 	}
 
-	return obj, objInfo.Size, nil
+	return obj, objInfo.Size, objInfo.ContentType, nil
+}
+
+func (s *store) AddBeat(ctx context.Context, userID int, beatPath string) (beatID int, err error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	stmt := `INSERT INTO beats (user_id, path) VALUES ($1, $2) RETURNING id`
+	err = s.DB.QueryRowContext(ctx, stmt, userID, beatPath).Scan(&beatID)
+	if err != nil {
+		return 0, err
+	}
+
+	return beatID, nil
+}
+
+func (s *store) GetPresignedURL(ctx context.Context, objectName string, expiry time.Duration) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	u, err := s.Client.PresignedPutObject(ctx, s.bucketName, objectName, expiry)
+	if err != nil {
+		return "", err
+	}
+
+	return u.String(), nil
 }

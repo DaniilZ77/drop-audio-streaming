@@ -13,6 +13,7 @@ type (
 		DB
 		TLS
 		Audio
+		Auth
 	}
 
 	HTTP struct {
@@ -36,7 +37,12 @@ type (
 	}
 
 	Audio struct {
-		ChunkSize int
+		ChunkSize    int
+		UploadURLTTL int
+	}
+
+	Auth struct {
+		JWTSecret string
 	}
 
 	TLS struct {
@@ -66,6 +72,10 @@ func NewConfig() (*Config, error) {
 
 	// audio
 	chunkSize := flag.Int("chunk_size", 1024, "chunk size")
+	urlTTL := flag.Int("upload_url_ttl", 30, "upload url ttl")
+
+	// auth
+	jwtSecret := flag.String("jwt_secret", "secret", "jwt secret")
 
 	flag.Parse()
 
@@ -92,7 +102,11 @@ func NewConfig() (*Config, error) {
 			Key:  *key,
 		},
 		Audio: Audio{
-			ChunkSize: *chunkSize,
+			ChunkSize:    *chunkSize,
+			UploadURLTTL: *urlTTL,
+		},
+		Auth: Auth{
+			JWTSecret: *jwtSecret,
 		},
 	}
 
