@@ -18,7 +18,7 @@ func New(beatStore core.BeatStorage) core.BeatService {
 	return &service{beatStore: beatStore}
 }
 
-func (s *service) GetBeat(ctx context.Context, beatID int, start, end int64) (*minio.Object, int, error) {
+func (s *service) GetBeat(ctx context.Context, beatID int64, start int64, end *int64) (*minio.Object, int64, error) {
 	beat, err := s.beatStore.GetBeatByID(ctx, beatID)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())

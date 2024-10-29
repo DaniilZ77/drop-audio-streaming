@@ -33,7 +33,7 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 		return
 	}
 
-	beat, size, err := r.beatService.GetBeat(ctx, int(id), start, end)
+	beat, size, err := r.beatService.GetBeat(ctx, id, start, &end)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatNotFound) {
@@ -45,9 +45,13 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 	}
 	defer beat.Close()
 
-	w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, min(size-1, int(end)), size))
 	w.Header().Set("Content-Type", "audio/mpeg")
-	w.WriteHeader(http.StatusPartialContent)
+	if start != 0 || end != -1 {
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, size))
+		w.WriteHeader(http.StatusPartialContent)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
 
 	if err = r.beatService.WritePartialContent(ctx, beat, w, r.chunkSize); err != nil {
 		logger.Log().Error(ctx, err.Error())
@@ -57,6 +61,10 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 
 func parseRangeHeader(ctx context.Context, req *http.Request) (start, end int64, err error) {
 	val := strings.TrimPrefix(req.Header.Get("Range"), "bytes=")
+	if val == "" {
+		return 0, -1, nil
+	}
+
 	tmp := strings.Split(val, "-")
 	if len(tmp) != 2 {
 		logger.Log().Error(ctx, "invalid range header")

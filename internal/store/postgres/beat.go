@@ -21,7 +21,7 @@ func New(m *minio.Minio, pg *postgres.Postgres, bucketName string) core.BeatStor
 	return &store{m, pg, bucketName}
 }
 
-func (s *store) GetBeatByID(ctx context.Context, id int) (*core.Beat, error) {
+func (s *store) GetBeatByID(ctx context.Context, id int64) (*core.Beat, error) {
 	var beat core.Beat
 
 	stmt := `SELECT id, user_id, path, is_deleted, created_at, updated_at FROM beats WHERE id = $1`
@@ -36,7 +36,7 @@ func (s *store) GetBeatByID(ctx context.Context, id int) (*core.Beat, error) {
 	return &beat, nil
 }
 
-func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start, end int64) (*miniolib.Object, int, error) {
+func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int64, end *int64) (*miniolib.Object, int64, error) {
 	objInfo, err := s.Client.StatObject(ctx, s.bucketName, beatPath, miniolib.StatObjectOptions{})
 	if err != nil {
 		return nil, 0, err
@@ -46,16 +46,19 @@ func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start, end i
 		return nil, 0, core.ErrInvalidRange
 	}
 
-	if end >= objInfo.Size {
-		end = objInfo.Size - 1
+	if *end >= objInfo.Size {
+		*end = objInfo.Size - 1
 	}
 
 	opts := miniolib.GetObjectOptions{}
-	opts.SetRange(start, end)
+	if start != 0 || *end != -1 {
+		opts.SetRange(start, *end)
+	}
+
 	obj, err := s.Client.GetObject(ctx, s.bucketName, beatPath, opts)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return obj, int(objInfo.Size), nil
+	return obj, objInfo.Size, nil
 }
