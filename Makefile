@@ -15,7 +15,7 @@ run: ### run app
 	-minio_endpoint 192.168.0.170:9000 -minio_bucket drop-audio \
 	-minio_use_ssl false -minio_location us-east-1 \
 	-chunk_size 1024 -jwt_secret secret -upload_url_ttl 4320 \
-	-user_history 50
+	-user_history 30
 
 build: ### build app
 	go build ${BUILD_FLAGS} -o ${SERVICE_NAME} cmd/auth/main.go

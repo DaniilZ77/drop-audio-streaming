@@ -106,9 +106,14 @@ func (s *service) GetBeatByParams(ctx context.Context, userID int, params core.B
 			if err = s.beatStore.ClearUserSeenBeats(ctx, userID); err != nil {
 				return nil, err
 			}
-			return nil, core.ErrBeatNotFound
+
+			beat, err = s.beatStore.GetBeatByParams(ctx, params, []string{})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
 		}
-		return nil, err
 	}
 
 	if err = s.beatStore.AddUserSeenBeat(ctx, userID, beat.ExternalID); err != nil {
