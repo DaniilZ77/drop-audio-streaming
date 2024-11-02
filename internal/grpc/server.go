@@ -7,6 +7,8 @@ import (
 	audiov1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model/validator"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,18 +24,21 @@ func Register(gRPCServer *grpc.Server, beatService core.BeatService) {
 }
 
 func (s *server) Upload(ctx context.Context, req *audiov1.UploadRequest) (*audiov1.UploadResponse, error) {
-	userID, err := getUserIDFromContext(ctx)
-	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		if errors.Is(err, core.ErrUnauthorized) {
-			return nil, status.Error(codes.Unauthenticated, core.ErrUnauthorized.Error())
-		}
-		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
+	v := validator.New()
+	model.ValidateUploadRequest(v, req)
+	if !v.Valid() {
+		logger.Log().Debug(ctx, "validation failed: %v", v.Errors)
+		return nil, toGRPCError(v)
 	}
 
-	_, beatPath, err := s.beatService.AddBeat(ctx, userID)
+	beat := model.ToCoreBeat(req)
+
+	beatPath, err := s.beatService.AddBeat(ctx, beat)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
+		if errors.Is(err, core.ErrBeatExists) {
+			return nil, status.Error(codes.AlreadyExists, err.Error())
+		}
 		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
 	}
 
@@ -43,5 +48,5 @@ func (s *server) Upload(ctx context.Context, req *audiov1.UploadRequest) (*audio
 		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
 	}
 
-	return &audiov1.UploadResponse{Url: url}, nil
+	return &audiov1.UploadResponse{BeatUploadUrl: url}, nil
 }

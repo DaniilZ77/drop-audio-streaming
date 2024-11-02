@@ -51,12 +51,28 @@
   },
   "definitions": {
     "audioUploadRequest": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "beatId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "beatmakerId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "beatArtist": {
+          "type": "string"
+        },
+        "beatGenre": {
+          "type": "string"
+        }
+      }
     },
     "audioUploadResponse": {
       "type": "object",
       "properties": {
-        "url": {
+        "beatUploadUrl": {
           "type": "string"
         }
       }

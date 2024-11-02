@@ -38,7 +38,7 @@ func New(
 	}
 
 	gwmux := runtime.NewServeMux()
-	router.NewRouter(gwmux, beatService, cfg.ChunkSize)
+	router.NewRouter(gwmux, beatService, cfg.ChunkSize, cfg.JWTSecret)
 
 	// Register user
 	err = audiov1.RegisterAudioServiceHandler(ctx, gwmux, conn)

@@ -34,11 +34,15 @@ type (
 		MinioBucket   string
 		MinioUseSSL   bool
 		MinioLocation string
+		RedisAddr     string
+		RedisPassword string
+		RedisDB       int
 	}
 
 	Audio struct {
 		ChunkSize    int
 		UploadURLTTL int
+		UserHistory  int
 	}
 
 	Auth struct {
@@ -72,7 +76,13 @@ func NewConfig() (*Config, error) {
 
 	// audio
 	chunkSize := flag.Int("chunk_size", 1024, "chunk size")
-	urlTTL := flag.Int("upload_url_ttl", 30, "upload url ttl")
+	urlTTL := flag.Int("upload_url_ttl", 4320, "upload url ttl in minutes")
+
+	// Redis
+	redisAddr := flag.String("redis_addr", "localhost:6379", "redis address")
+	redisPassword := flag.String("redis_password", "", "redis password")
+	redisDB := flag.Int("redis_db", 0, "redis db")
+	userHistory := flag.Int("user_history", 50, "max user history size")
 
 	// auth
 	jwtSecret := flag.String("jwt_secret", "secret", "jwt secret")
@@ -96,6 +106,9 @@ func NewConfig() (*Config, error) {
 			MinioBucket:   *minioBucket,
 			MinioUseSSL:   *minioUseSSL,
 			MinioLocation: *minioLocation,
+			RedisAddr:     *redisAddr,
+			RedisPassword: *redisPassword,
+			RedisDB:       *redisDB,
 		},
 		TLS: TLS{
 			Cert: *cert,
@@ -104,6 +117,7 @@ func NewConfig() (*Config, error) {
 		Audio: Audio{
 			ChunkSize:    *chunkSize,
 			UploadURLTTL: *urlTTL,
+			UserHistory:  *userHistory,
 		},
 		Auth: Auth{
 			JWTSecret: *jwtSecret,

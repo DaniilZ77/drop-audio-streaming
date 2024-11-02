@@ -1,1 +1,1 @@
-drop table "beats" if not exists;
+drop table if exists "beats" cascade;

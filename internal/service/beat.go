@@ -2,6 +2,7 @@ package beat
 
 import (
 	"context"
+	"errors"
 	"io"
 	"sync"
 	"time"
@@ -9,7 +10,6 @@ import (
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/google/uuid"
-	minio "github.com/minio/minio-go/v7"
 )
 
 type service struct {
@@ -21,7 +21,7 @@ func New(beatStore core.BeatStorage, uploadURLTTL int) core.BeatService {
 	return &service{beatStore: beatStore, uploadURLTTL: uploadURLTTL}
 }
 
-func (s *service) GetBeat(ctx context.Context, beatID int64, start int64, end *int64) (*minio.Object, int64, string, error) {
+func (s *service) GetBeat(ctx context.Context, beatID int64, start int64, end *int64) (io.ReadCloser, int64, string, error) {
 	beat, err := s.beatStore.GetBeatByID(ctx, beatID)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
@@ -76,18 +76,48 @@ func (s *service) WritePartialContent(ctx context.Context, r io.Reader, w io.Wri
 	return nil
 }
 
-func (s *service) AddBeat(ctx context.Context, userID int) (beatID int, beatPath string, err error) {
+func (s *service) AddBeat(ctx context.Context, beat core.Beat) (beatPath string, err error) {
 	beatPath = uuid.New().String()
-	beatID, err = s.beatStore.AddBeat(ctx, userID, beatPath)
+	beat.Path = beatPath
 
-	return beatID, beatPath, err
+	_, err = s.beatStore.AddBeat(ctx, beat)
+
+	return beatPath, err
 }
 
 func (s *service) GetUploadURL(ctx context.Context, beatPath string) (string, error) {
-	path, err := s.beatStore.GetPresignedURL(ctx, beatPath, time.Duration(s.uploadURLTTL)*time.Second)
+	path, err := s.beatStore.GetPresignedURL(ctx, beatPath, time.Duration(s.uploadURLTTL)*time.Minute)
 	if err != nil {
 		return "", err
 	}
 
 	return path, nil
+}
+
+func (s *service) GetBeatByParams(ctx context.Context, userID int, params core.BeatParams) (beat *core.Beat, err error) {
+	beats, err := s.beatStore.GetUserSeenBeats(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	beat, err = s.beatStore.GetBeatByParams(ctx, params, beats)
+	if err != nil {
+		if errors.Is(err, core.ErrBeatNotFound) {
+			if err = s.beatStore.ClearUserSeenBeats(ctx, userID); err != nil {
+				return nil, err
+			}
+			return nil, core.ErrBeatNotFound
+		}
+		return nil, err
+	}
+
+	if err = s.beatStore.AddUserSeenBeat(ctx, userID, beat.ExternalID); err != nil {
+		return nil, err
+	}
+
+	if err = s.beatStore.PopUserSeenBeat(ctx, userID); err != nil {
+		return nil, err
+	}
+
+	return beat, nil
 }

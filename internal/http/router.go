@@ -11,13 +11,15 @@ type Router struct {
 	app         *runtime.ServeMux
 	beatService core.BeatService
 	chunkSize   int
+	jwtSecret   string
 }
 
-func NewRouter(app *runtime.ServeMux, beatService core.BeatService, chunkSize int) {
+func NewRouter(app *runtime.ServeMux, beatService core.BeatService, chunkSize int, jwtSecret string) {
 	r := &Router{
 		app:         app,
 		beatService: beatService,
 		chunkSize:   chunkSize,
+		jwtSecret:   jwtSecret,
 	}
 
 	r.initRoutes()
@@ -25,4 +27,5 @@ func NewRouter(app *runtime.ServeMux, beatService core.BeatService, chunkSize in
 
 func (r *Router) initRoutes() {
 	r.app.HandlePath(http.MethodGet, "/v1/audio/{id}", r.stream)
+	r.app.HandlePath(http.MethodGet, "/v1/audio", r.ensureValidToken(r.getBeat))
 }

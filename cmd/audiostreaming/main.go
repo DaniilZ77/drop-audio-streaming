@@ -22,6 +22,7 @@ func main() {
 
 	// Closing DBs
 	defer application.PG.Close(ctx)
+	defer application.RDB.Close()
 
 	go func() { application.GRPCServer.MustRun(ctx) }()
 
