@@ -12,7 +12,7 @@ run: ### run app
 	go run cmd/audiostreaming/main.go -db_url '$(PG_URL)' \
 	-grpc_port localhost:50051 -http_port localhost:8080 -log_level debug -cert ./tls/cert.pem \
 	-key ./tls/key.pem -minio_password minioadmin -minio_user minioadmin \
-	-minio_endpoint 192.168.0.170:9000 -minio_bucket drop-audio \
+	-minio_endpoint 192.168.0.171:9000 -minio_bucket drop-audio \
 	-minio_use_ssl false -minio_location us-east-1 \
 	-chunk_size 1024 -jwt_secret secret -upload_url_ttl 4320 \
 	-user_history 30

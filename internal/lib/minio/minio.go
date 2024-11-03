@@ -68,6 +68,9 @@ func New(ctx context.Context, config MinioConfig, opts ...Option) (*Minio, error
 		return nil, err
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
 	exists, err := client.BucketExists(ctx, config.Bucket)
 	if err != nil {
 		logger.Log().Fatal(ctx, "failed to check bucket: %s", err.Error())

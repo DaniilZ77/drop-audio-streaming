@@ -116,11 +116,11 @@ func (s *service) GetBeatByParams(ctx context.Context, userID int, params core.B
 		}
 	}
 
-	if err = s.beatStore.AddUserSeenBeat(ctx, userID, beat.ExternalID); err != nil {
+	if err = s.beatStore.PopUserSeenBeat(ctx, userID); err != nil {
 		return nil, err
 	}
 
-	if err = s.beatStore.PopUserSeenBeat(ctx, userID); err != nil {
+	if err = s.beatStore.AddUserSeenBeat(ctx, userID, beat.ExternalID); err != nil {
 		return nil, err
 	}
 

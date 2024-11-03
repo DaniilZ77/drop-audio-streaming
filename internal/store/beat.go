@@ -221,7 +221,7 @@ func (s *store) PopUserSeenBeat(ctx context.Context, userID int) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	if cnt, err := s.Redis.Client.LLen(ctx, fmt.Sprintf("%d", userID)).Result(); err != nil || cnt < int64(s.userHistory) {
+	if cnt, err := s.Redis.Client.LLen(ctx, fmt.Sprintf("%d", userID)).Result(); err != nil || cnt <= int64(s.userHistory) {
 		return err
 	}
 

@@ -51,14 +51,14 @@ func New(ctx context.Context, config Config, opts ...Option) (*Redis, error) {
 		})
 
 		_, err = db.Ping(ctx).Result()
-		if err != nil {
-			logger.Log().Debug(ctx,
-				"redis is trying to connect, attempts left: %d", rdb.connAttempts,
-			)
-		} else {
+		if err == nil {
 			rdb.Client = db
 			break
 		}
+
+		logger.Log().Debug(ctx,
+			"redis is trying to connect, attempts left: %d", rdb.connAttempts,
+		)
 
 		time.Sleep(rdb.connTimeout)
 
