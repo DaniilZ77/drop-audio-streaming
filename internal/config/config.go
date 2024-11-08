@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"time"
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 )
@@ -17,9 +18,12 @@ type (
 	}
 
 	HTTP struct {
-		GRPCPort    string
-		HTTPPort    string
-		ReadTimeout int
+		GRPCPort           string
+		GRPCClientRetries  int
+		GRPCClientTimeout  time.Duration
+		GRPCUserClientAddr string
+		HTTPPort           string
+		ReadTimeout        int
 	}
 
 	Log struct {
@@ -87,13 +91,21 @@ func NewConfig() (*Config, error) {
 	// auth
 	jwtSecret := flag.String("jwt_secret", "secret", "jwt secret")
 
+	// grpc client
+	grpcClientRetries := flag.Int("grpc_client_retries", 1, "grpc client retries")
+	grpcClientTimeout := flag.Duration("grpc_client_timeout", 2*time.Second, "grpc client timeout")
+	grpcUserClientAddr := flag.String("grpc_user_client_addr", "", "grpc user client addr")
+
 	flag.Parse()
 
 	cfg := &Config{
 		HTTP: HTTP{
-			GRPCPort:    *gRPCPort,
-			HTTPPort:    *httpPort,
-			ReadTimeout: *readTimeout,
+			GRPCPort:           *gRPCPort,
+			GRPCClientRetries:  *grpcClientRetries,
+			GRPCClientTimeout:  *grpcClientTimeout,
+			GRPCUserClientAddr: *grpcUserClientAddr,
+			HTTPPort:           *httpPort,
+			ReadTimeout:        *readTimeout,
 		},
 		Log: Log{
 			Level: *logLevel,

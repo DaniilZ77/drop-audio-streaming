@@ -10,4 +10,5 @@ var (
 	ErrBeatExists       = errors.New("beat already exists")
 	ErrValidationFailed = errors.New("validation failed")
 	ErrInvalidParams    = errors.New("invalid params")
+	ErrUnavailable      = errors.New("unavailable")
 )

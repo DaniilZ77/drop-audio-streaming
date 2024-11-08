@@ -5,6 +5,7 @@ import (
 
 	grpcapp "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/app/grpc"
 	httpapp "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/app/http"
+	userclient "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/client/user/grpc"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/config"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/minio"
@@ -30,6 +31,7 @@ func New(ctx context.Context, cfg *config.Config) *App {
 	pg, err := postgres.New(ctx, cfg.DB.URL)
 	if err != nil {
 		logger.Log().Fatal(ctx, "error with connection to database: %s", err.Error())
+		return nil
 	}
 
 	// Redis connection
@@ -40,6 +42,7 @@ func New(ctx context.Context, cfg *config.Config) *App {
 	})
 	if err != nil {
 		logger.Log().Fatal(ctx, "error with connection to redis: %s", err.Error())
+		return nil
 	}
 
 	// Minio connection
@@ -51,6 +54,7 @@ func New(ctx context.Context, cfg *config.Config) *App {
 	})
 	if err != nil {
 		logger.Log().Fatal(ctx, "error with connection to minio: %s", err.Error())
+		return nil
 	}
 
 	// Store
@@ -65,11 +69,23 @@ func New(ctx context.Context, cfg *config.Config) *App {
 	// Service
 	beatService := beat.New(beatStore, cfg.UploadURLTTL)
 
+	// gRPC client
+	gRPCUserClient, err := userclient.New(
+		ctx,
+		cfg.GRPCUserClientAddr,
+		cfg.GRPCClientTimeout,
+		cfg.GRPCClientRetries,
+	)
+	if err != nil {
+		logger.Log().Fatal(ctx, "error with connection to user grpc server: %s", err.Error())
+		return nil
+	}
+
 	// gRPC server
 	gRPCApp := grpcapp.New(ctx, cfg, beatService)
 
 	// HTTP server
-	httpApp := httpapp.New(ctx, cfg, beatService)
+	httpApp := httpapp.New(ctx, cfg, beatService, gRPCUserClient)
 
 	return &App{
 		GRPCServer: gRPCApp,

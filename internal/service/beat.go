@@ -106,35 +106,35 @@ func (s *service) GetUploadURL(ctx context.Context, beatPath string) (string, er
 	return path, nil
 }
 
-func (s *service) GetBeatByParams(ctx context.Context, userID int, params core.BeatParams) (beat *core.Beat, err error) {
+func (s *service) GetBeatByParams(ctx context.Context, userID int, params core.BeatParams) (beat *core.Beat, genre *string, err error) {
 	beats, err := s.beatStore.GetUserSeenBeats(ctx, userID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	beat, err = s.beatStore.GetBeatByParams(ctx, params, beats)
+	beat, genre, err = s.beatStore.GetBeatByParams(ctx, params, beats)
 	if err != nil {
 		if errors.Is(err, core.ErrBeatNotFound) {
 			if err = s.beatStore.ClearUserSeenBeats(ctx, userID); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
-			beat, err = s.beatStore.GetBeatByParams(ctx, params, []string{})
+			beat, genre, err = s.beatStore.GetBeatByParams(ctx, params, []string{})
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		} else {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	if err = s.beatStore.PopUserSeenBeat(ctx, userID); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err = s.beatStore.AddUserSeenBeat(ctx, userID, beat.ID); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return beat, nil
+	return beat, genre, nil
 }

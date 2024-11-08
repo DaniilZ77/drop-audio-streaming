@@ -146,7 +146,7 @@ func (s *store) GetPresignedURL(ctx context.Context, path string, expiry time.Du
 	return u.String(), nil
 }
 
-func (s *store) GetBeatByParams(ctx context.Context, params core.BeatParams, seen []string) (beat *core.Beat, err error) {
+func (s *store) GetBeatByParams(ctx context.Context, params core.BeatParams, seen []string) (beat *core.Beat, genre *string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
@@ -158,14 +158,14 @@ func (s *store) GetBeatByParams(ctx context.Context, params core.BeatParams, see
 			AND b.is_downloaded = true
 			AND b.is_deleted = false
 			AND bg.beat_id NOT IN (SELECT UNNEST($2::int[]))
-			ORDER BY random()
 		), b as (
 			SELECT * FROM a
 			OFFSET FLOOR(random() * (SELECT COUNT(*) FROM a))
 		)
 
-		SELECT beat_id, beatmaker_id, created_at FROM b LIMIT 1`
+		SELECT beat_id, beatmaker_id, created_at, genre FROM b LIMIT 1`
 	beat = new(core.Beat)
+	genre = new(string)
 	err = s.DB.QueryRowContext(
 		ctx,
 		stmt,
@@ -173,15 +173,17 @@ func (s *store) GetBeatByParams(ctx context.Context, params core.BeatParams, see
 		seen).Scan(
 		&beat.ID,
 		&beat.BeatmakerID,
-		&beat.CreatedAt)
+		&beat.CreatedAt,
+		genre,
+	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, core.ErrBeatNotFound
+			return nil, nil, core.ErrBeatNotFound
 		}
-		return nil, err
+		return nil, nil, err
 	}
 
-	return beat, nil
+	return beat, genre, nil
 }
 
 func (s *store) GetUserSeenBeats(ctx context.Context, userID int) ([]string, error) {

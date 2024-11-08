@@ -71,7 +71,7 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 	}
 
 	beatParams := model.ToCoreBeatParams(req.URL.Query())
-	beat, err := r.beatService.GetBeatByParams(ctx, userID, beatParams)
+	beat, genre, err := r.beatService.GetBeatByParams(ctx, userID, beatParams)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatNotFound) {
@@ -82,10 +82,19 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 		return
 	}
 
-	b, err := toJSON(model.ToBeat(beat))
+	beatmaker, err := r.userClient.GetUserByID(ctx, beat.BeatmakerID)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	apiBeatmaker := model.ToBeatmaker(beatmaker)
+
+	b, err := toJSON(model.ToBeat(beat, apiBeatmaker, genre))
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		http.Error(w, core.ErrUnavailable.Error(), http.StatusServiceUnavailable)
 		return
 	}
 

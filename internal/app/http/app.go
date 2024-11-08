@@ -6,6 +6,7 @@ import (
 	"time"
 
 	audiov1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio"
+	userclient "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/client/user/grpc"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/config"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
 	router "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/http"
@@ -26,6 +27,7 @@ func New(
 	ctx context.Context,
 	cfg *config.Config,
 	beatService core.BeatService,
+	grpcUserClient *userclient.Client,
 ) *App {
 	creds, err := credentials.NewClientTLSFromFile(cfg.Cert, "")
 	if err != nil {
@@ -38,7 +40,7 @@ func New(
 	}
 
 	gwmux := runtime.NewServeMux()
-	router.NewRouter(gwmux, beatService, cfg.ChunkSize, cfg.JWTSecret)
+	router.NewRouter(gwmux, beatService, cfg.ChunkSize, cfg.JWTSecret, grpcUserClient)
 
 	// Register user
 	err = audiov1.RegisterAudioServiceHandler(ctx, gwmux, conn)

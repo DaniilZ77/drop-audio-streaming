@@ -14,7 +14,7 @@ type (
 		GetBeatByID(ctx context.Context, id int64) (*Beat, error)
 		AddBeat(ctx context.Context, beat Beat, beatGenre []BeatGenre) (beatID int, err error)
 		GetPresignedURL(ctx context.Context, path string, expiry time.Duration) (url string, err error)
-		GetBeatByParams(ctx context.Context, params BeatParams, seen []string) (beat *Beat, err error)
+		GetBeatByParams(ctx context.Context, params BeatParams, seen []string) (beat *Beat, genre *string, err error)
 		GetUserSeenBeats(ctx context.Context, userID int) ([]string, error)
 		AddUserSeenBeat(ctx context.Context, userID int, beatID int) error
 		PopUserSeenBeat(ctx context.Context, userID int) error
@@ -26,7 +26,7 @@ type (
 		AddBeat(ctx context.Context, beat Beat, beatGenre []BeatGenre) (beatPath string, err error)
 		WritePartialContent(ctx context.Context, r io.Reader, w io.Writer, chunkSize int) error
 		GetUploadURL(ctx context.Context, beatPath string) (url string, err error)
-		GetBeatByParams(ctx context.Context, userID int, params BeatParams) (beat *Beat, err error)
+		GetBeatByParams(ctx context.Context, userID int, params BeatParams) (beat *Beat, genre *string, err error)
 	}
 
 	BeatParams struct {
