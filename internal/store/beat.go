@@ -151,7 +151,7 @@ func (s *store) GetBeatByParams(ctx context.Context, params core.BeatParams, see
 	defer cancel()
 
 	stmt :=
-		`WITH RECURSIVE a AS (
+		`WITH a AS (
 			SELECT bg.id, bg.beat_id, bg.genre, b.beatmaker_id, b.is_downloaded, b.is_deleted, b.created_at FROM beats_genres bg
 			JOIN beats b ON bg.beat_id = b.id
 			WHERE bg.genre LIKE $1
@@ -159,9 +159,12 @@ func (s *store) GetBeatByParams(ctx context.Context, params core.BeatParams, see
 			AND b.is_deleted = false
 			AND bg.beat_id NOT IN (SELECT UNNEST($2::int[]))
 			ORDER BY random()
+		), b as (
+			SELECT * FROM a
+			OFFSET FLOOR(random() * (SELECT COUNT(*) FROM a))
 		)
 
-		SELECT beat_id, beatmaker_id, created_at FROM a LIMIT 1`
+		SELECT beat_id, beatmaker_id, created_at FROM b LIMIT 1`
 	beat = new(core.Beat)
 	err = s.DB.QueryRowContext(
 		ctx,
