@@ -29,3 +29,11 @@ func (r *Router) ensureValidToken(next runtime.HandlerFunc) runtime.HandlerFunc 
 		next(w, req.WithContext(ctx), params)
 	}
 }
+
+func LoggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger.Log().Info(r.Context(), "%s %s", r.Method, r.URL.Path)
+
+		next.ServeHTTP(w, r)
+	})
+}

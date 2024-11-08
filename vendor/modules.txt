@@ -1,4 +1,4 @@
-# github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.0.33
+# github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.0.44
 ## explicit; go 1.23.1
 github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio
 # github.com/cespare/xxhash/v2 v2.3.0

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/minio"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/postgres"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/redis"
@@ -40,16 +39,15 @@ func (s *store) GetBeatByID(ctx context.Context, beatID int64) (*core.Beat, erro
 
 	var beat core.Beat
 
-	stmt := `SELECT external_id, beatmaker_id, path, artist, genre, is_deleted, created_at, updated_at
+	stmt := `SELECT id, beatmaker_id, path, is_downloaded, is_deleted, created_at, updated_at
 	FROM beats
-	WHERE external_id = $1`
+	WHERE id = $1`
 
 	err := s.DB.QueryRowContext(ctx, stmt, beatID).Scan(
-		&beat.ExternalID,
+		&beat.ID,
 		&beat.BeatmakerID,
 		&beat.Path,
-		&beat.Artist,
-		&beat.Genre,
+		&beat.IsDownloaded,
 		&beat.IsDeleted,
 		&beat.CreatedAt,
 		&beat.UpdatedAt)
@@ -69,11 +67,11 @@ func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int64,
 		return nil, 0, "", err
 	}
 
-	if start >= objInfo.Size {
+	if start >= objInfo.Size || start < 0 {
 		return nil, 0, "", core.ErrInvalidRange
 	}
 
-	if *end >= objInfo.Size {
+	if *end >= objInfo.Size || start > 0 && *end == -1 {
 		*end = objInfo.Size - 1
 	}
 
@@ -90,27 +88,47 @@ func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int64,
 	return obj, objInfo.Size, objInfo.ContentType, nil
 }
 
-func (s *store) AddBeat(ctx context.Context, beat core.Beat) (beatID int, err error) {
+func (s *store) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.BeatGenre) (beatID int, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	stmt := `INSERT INTO beats (external_id, beatmaker_id, path, artist, genre)
-	VALUES ($1, $2, $3, $4, $5)
-	RETURNING external_id`
-	err = s.DB.QueryRowContext(
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback() // nolint
+		} else {
+			tx.Commit() // nolint
+		}
+	}()
+
+	stmt := `INSERT INTO beats (id, beatmaker_id, path)
+	VALUES ($1, $2, $3)
+	RETURNING id`
+	err = tx.QueryRowContext(
 		ctx,
 		stmt,
-		beat.ExternalID,
+		beat.ID,
 		beat.BeatmakerID,
-		beat.Path,
-		beat.Artist,
-		beat.Genre).Scan(&beatID)
+		beat.Path).Scan(&beatID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 			return 0, core.ErrBeatExists
 		}
 		return 0, err
+	}
+
+	stmt = `INSERT INTO beats_genres (beat_id, genre)
+	VALUES ($1, $2)`
+	for _, bg := range beatGenre {
+		err = tx.QueryRowContext(ctx, stmt, bg.BeatID, bg.Genre).Err()
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	return beatID, nil
@@ -132,57 +150,27 @@ func (s *store) GetBeatByParams(ctx context.Context, params core.BeatParams, see
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	stmt := `SELECT MIN(external_id), MAX(external_id) FROM beats`
-	var minID, maxID int
-	err = s.DB.QueryRowContext(ctx, stmt).Scan(&minID, &maxID)
-	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		return nil, core.ErrBeatNotFound
-	}
-	gap := maxID - minID + 1
-
-	stmt =
+	stmt :=
 		`WITH RECURSIVE a AS (
-			SELECT external_id, beatmaker_id, path, artist, genre, is_deleted, created_at, updated_at
-			FROM beats
-			WHERE artist LIKE $1
-			AND genre LIKE $2
-			AND is_deleted = false
-			AND external_id NOT IN (SELECT unnest($5::int[]))
-		), b as (
-			SELECT *
-			FROM (
-				SELECT $3 + trunc(random() * $4)::int as external_id
-				FROM generate_series(1, 1000)
-			) JOIN a USING (external_id)
-
-			UNION
-
-			SELECT *
-			FROM (
-				SELECT $3 + trunc(random() * $4)::int as external_id
-				FROM b
-			) JOIN a USING (external_id)
+			SELECT bg.id, bg.beat_id, bg.genre, b.beatmaker_id, b.is_downloaded, b.is_deleted, b.created_at FROM beats_genres bg
+			JOIN beats b ON bg.beat_id = b.id
+			WHERE bg.genre LIKE $1
+			AND b.is_downloaded = true
+			AND b.is_deleted = false
+			AND bg.beat_id NOT IN (SELECT UNNEST($2::int[]))
+			ORDER BY random()
 		)
 
-		SELECT * FROM b LIMIT 1`
+		SELECT beat_id, beatmaker_id, created_at FROM a LIMIT 1`
 	beat = new(core.Beat)
 	err = s.DB.QueryRowContext(
 		ctx,
 		stmt,
-		params.Artist+"%",
 		params.Genre+"%",
-		minID,
-		gap,
 		seen).Scan(
-		&beat.ExternalID,
+		&beat.ID,
 		&beat.BeatmakerID,
-		&beat.Path,
-		&beat.Artist,
-		&beat.Genre,
-		&beat.IsDeleted,
-		&beat.CreatedAt,
-		&beat.UpdatedAt)
+		&beat.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, core.ErrBeatNotFound

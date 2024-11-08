@@ -68,7 +68,7 @@ func parseRangeHeader(ctx context.Context, req *http.Request) (start, end int64,
 	}
 
 	if tmp[1] == "" {
-		return start, start + 1024*1024, nil
+		return start, -1, nil
 	}
 	end, err = strconv.ParseInt(tmp[1], 10, 64)
 	if err != nil {

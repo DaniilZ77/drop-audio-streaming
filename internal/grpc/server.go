@@ -32,8 +32,9 @@ func (s *server) Upload(ctx context.Context, req *audiov1.UploadRequest) (*audio
 	}
 
 	beat := model.ToCoreBeat(req)
+	beatGenre := model.ToCoreBeatGenre(req)
 
-	beatPath, err := s.beatService.AddBeat(ctx, beat)
+	beatPath, err := s.beatService.AddBeat(ctx, beat, beatGenre)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatExists) {

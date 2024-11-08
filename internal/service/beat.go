@@ -44,6 +44,7 @@ func (s *service) WritePartialContent(ctx context.Context, r io.Reader, w io.Wri
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	defer logger.Log().Debug(ctx, "beat stream ended")
 	defer close(data)
 	defer wg.Wait()
 
@@ -76,11 +77,22 @@ func (s *service) WritePartialContent(ctx context.Context, r io.Reader, w io.Wri
 	return nil
 }
 
-func (s *service) AddBeat(ctx context.Context, beat core.Beat) (beatPath string, err error) {
+func (s *service) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.BeatGenre) (beatPath string, err error) {
 	beatPath = uuid.New().String()
 	beat.Path = beatPath
 
-	_, err = s.beatStore.AddBeat(ctx, beat)
+	_, err = s.beatStore.AddBeat(ctx, beat, beatGenre)
+	if err != nil {
+		if errors.Is(err, core.ErrBeatExists) {
+			beat, err := s.beatStore.GetBeatByID(ctx, int64(beat.ID))
+			if err != nil {
+				return "", err
+			}
+
+			return beat.Path, nil
+		}
+		return "", nil
+	}
 
 	return beatPath, err
 }
@@ -120,7 +132,7 @@ func (s *service) GetBeatByParams(ctx context.Context, userID int, params core.B
 		return nil, err
 	}
 
-	if err = s.beatStore.AddUserSeenBeat(ctx, userID, beat.ExternalID); err != nil {
+	if err = s.beatStore.AddUserSeenBeat(ctx, userID, beat.ID); err != nil {
 		return nil, err
 	}
 

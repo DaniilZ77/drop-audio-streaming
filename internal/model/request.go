@@ -9,16 +9,24 @@ import (
 
 func ToCoreBeat(req *audiov1.UploadRequest) core.Beat {
 	return core.Beat{
-		ExternalID:  int(req.GetBeatId()),
+		ID:          int(req.GetBeatId()),
 		BeatmakerID: int(req.GetBeatmakerId()),
-		Artist:      req.GetBeatArtist(),
-		Genre:       req.GetBeatGenre(),
 	}
+}
+
+func ToCoreBeatGenre(req *audiov1.UploadRequest) []core.BeatGenre {
+	var beatGenre []core.BeatGenre
+	for _, genre := range req.GetBeatGenre() {
+		beatGenre = append(beatGenre, core.BeatGenre{
+			BeatID: int(req.GetBeatId()),
+			Genre:  genre,
+		})
+	}
+	return beatGenre
 }
 
 func ToCoreBeatParams(params url.Values) core.BeatParams {
 	return core.BeatParams{
-		Artist: params.Get("artist"),
-		Genre:  params.Get("genre"),
+		Genre: params.Get("genre"),
 	}
 }

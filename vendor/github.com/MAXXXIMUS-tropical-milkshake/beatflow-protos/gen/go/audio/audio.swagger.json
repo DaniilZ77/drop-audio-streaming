@@ -61,11 +61,11 @@
           "type": "string",
           "format": "int64"
         },
-        "beatArtist": {
-          "type": "string"
-        },
         "beatGenre": {
-          "type": "string"
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

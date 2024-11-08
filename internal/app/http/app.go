@@ -52,7 +52,7 @@ func New(
 	// Server
 	gwServer := &http.Server{
 		Addr:              cfg.HTTPPort,
-		Handler:           withCors,
+		Handler:           router.LoggingMiddleware(withCors),
 		ReadHeaderTimeout: time.Duration(cfg.ReadTimeout) * time.Second,
 	}
 

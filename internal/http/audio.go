@@ -32,6 +32,8 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 		return
 	}
 
+	logger.Log().Debug(ctx, "start: %d; end: %d", start, end)
+
 	beat, size, contentType, err := r.beatService.GetBeat(ctx, id, start, &end)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
