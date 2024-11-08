@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 
+	userclient "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/client/user/grpc"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/config"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
 	audio "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/grpc"
@@ -26,6 +27,7 @@ func New(
 	ctx context.Context,
 	cfg *config.Config,
 	beatService core.BeatService,
+	grpcUserClient *userclient.Client,
 ) *App {
 	opts := []grpc.ServerOption{}
 
@@ -62,7 +64,7 @@ func New(
 	gRPCServer := grpc.NewServer(opts...)
 
 	// Register services
-	audio.Register(gRPCServer, beatService)
+	audio.Register(gRPCServer, beatService, grpcUserClient)
 
 	return &App{
 		gRPCServer: gRPCServer,

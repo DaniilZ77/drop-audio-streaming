@@ -138,3 +138,38 @@ func (s *service) GetBeatByParams(ctx context.Context, userID int, params core.B
 
 	return beat, genre, nil
 }
+
+func (s *service) GetBeatMeta(ctx context.Context, beatID int) (beat *core.Beat, beatGenres []core.BeatGenre, err error) {
+	beat, err = s.beatStore.GetBeatByID(ctx, int64(beatID))
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, nil, err
+	}
+
+	beatGenres, err = s.beatStore.GetBeatGenres(ctx, beatID)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, nil, err
+	}
+
+	return beat, beatGenres, nil
+}
+
+func (s *service) GetBeatsMetaByBeatmakerID(ctx context.Context, beatmakerID int, p core.Pagination) (beats []core.Beat, beatsGenres [][]core.BeatGenre, total int, err error) {
+	beats, total, err = s.beatStore.GetBeatsByBeatmakerID(ctx, beatmakerID, p)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, nil, 0, err
+	}
+
+	for _, beat := range beats {
+		genres, err := s.beatStore.GetBeatGenres(ctx, beat.ID)
+		if err != nil {
+			logger.Log().Error(ctx, err.Error())
+			return nil, nil, 0, err
+		}
+		beatsGenres = append(beatsGenres, genres)
+	}
+
+	return beats, beatsGenres, total, nil
+}

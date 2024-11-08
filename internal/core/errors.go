@@ -11,4 +11,8 @@ var (
 	ErrValidationFailed = errors.New("validation failed")
 	ErrInvalidParams    = errors.New("invalid params")
 	ErrUnavailable      = errors.New("unavailable")
+	ErrInvalidLimit     = errors.New("invalid limit")
+	ErrInvalidOffset    = errors.New("invalid offset")
+	ErrInvalidParam     = errors.New("invalid param")
+	ErrInvalidID        = errors.New("invalid id")
 )

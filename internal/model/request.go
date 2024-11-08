@@ -11,6 +11,8 @@ func ToCoreBeat(req *audiov1.UploadRequest) core.Beat {
 	return core.Beat{
 		ID:          int(req.GetBeatId()),
 		BeatmakerID: int(req.GetBeatmakerId()),
+		Name:        req.GetName(),
+		Description: req.GetDescription(),
 	}
 }
 

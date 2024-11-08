@@ -34,6 +34,7 @@ func NewRouter(
 }
 
 func (r *Router) initRoutes() {
-	r.app.HandlePath(http.MethodGet, "/v1/audio/{id}", r.stream)
-	r.app.HandlePath(http.MethodGet, "/v1/audio/play", r.ensureValidToken(r.getBeat))
+	r.app.HandlePath(http.MethodGet, "/v1/audio/{id}/stream", r.stream)
+	r.app.HandlePath(http.MethodGet, "/v1/feed/audio", r.ensureValidToken(r.getBeat))
+	r.app.HandlePath(http.MethodGet, "/v1/beatmaker/{id}/audio", r.getBeatmakerBeats)
 }

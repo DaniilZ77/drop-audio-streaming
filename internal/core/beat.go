@@ -19,6 +19,8 @@ type (
 		AddUserSeenBeat(ctx context.Context, userID int, beatID int) error
 		PopUserSeenBeat(ctx context.Context, userID int) error
 		ClearUserSeenBeats(ctx context.Context, userID int) error
+		GetBeatGenres(ctx context.Context, beatID int) (beatGenres []BeatGenre, err error)
+		GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p Pagination) (beats []Beat, total int, err error)
 	}
 
 	BeatService interface {
@@ -27,6 +29,8 @@ type (
 		WritePartialContent(ctx context.Context, r io.Reader, w io.Writer, chunkSize int) error
 		GetUploadURL(ctx context.Context, beatPath string) (url string, err error)
 		GetBeatByParams(ctx context.Context, userID int, params BeatParams) (beat *Beat, genre *string, err error)
+		GetBeatMeta(ctx context.Context, beatID int) (beat *Beat, beatGenres []BeatGenre, err error)
+		GetBeatsMetaByBeatmakerID(ctx context.Context, beatmakerID int, p Pagination) (beats []Beat, beatsGenres [][]BeatGenre, total int, err error)
 	}
 
 	BeatParams struct {
@@ -43,9 +47,16 @@ type (
 		ID           int
 		BeatmakerID  int
 		Path         string
+		Name         string
+		Description  string
 		IsDownloaded bool
 		IsDeleted    bool
 		CreatedAt    time.Time
 		UpdatedAt    time.Time
+	}
+
+	Pagination struct {
+		Limit  int
+		Offset int
 	}
 )

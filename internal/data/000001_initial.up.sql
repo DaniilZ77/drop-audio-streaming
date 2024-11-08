@@ -2,6 +2,8 @@ create table if not exists "beats" (
     "id" integer primary key,
     "beatmaker_id" integer not null,
     "path" varchar(64) not null,
+    "name" varchar(128) not null,
+    "description" text not null,
     "is_downloaded" boolean not null default false,
     "is_deleted" boolean not null default false,
     "created_at" timestamp not null default current_timestamp,

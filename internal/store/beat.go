@@ -39,14 +39,16 @@ func (s *store) GetBeatByID(ctx context.Context, beatID int64) (*core.Beat, erro
 
 	var beat core.Beat
 
-	stmt := `SELECT id, beatmaker_id, path, is_downloaded, is_deleted, created_at, updated_at
+	stmt := `SELECT id, beatmaker_id, path, name, description, is_downloaded, is_deleted, created_at, updated_at
 	FROM beats
-	WHERE id = $1`
+	WHERE id = $1 AND is_downloaded = true AND is_deleted = false`
 
 	err := s.DB.QueryRowContext(ctx, stmt, beatID).Scan(
 		&beat.ID,
 		&beat.BeatmakerID,
 		&beat.Path,
+		&beat.Name,
+		&beat.Description,
 		&beat.IsDownloaded,
 		&beat.IsDeleted,
 		&beat.CreatedAt,
@@ -105,8 +107,8 @@ func (s *store) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.Be
 		}
 	}()
 
-	stmt := `INSERT INTO beats (id, beatmaker_id, path)
-	VALUES ($1, $2, $3)
+	stmt := `INSERT INTO beats (id, beatmaker_id, path, name, description)
+	VALUES ($1, $2, $3, $4, $5)
 	RETURNING id`
 	err = tx.QueryRowContext(
 		ctx,
@@ -152,7 +154,7 @@ func (s *store) GetBeatByParams(ctx context.Context, params core.BeatParams, see
 
 	stmt :=
 		`WITH a AS (
-			SELECT bg.id, bg.beat_id, bg.genre, b.beatmaker_id, b.is_downloaded, b.is_deleted, b.created_at FROM beats_genres bg
+			SELECT bg.id, bg.beat_id, bg.genre, b.beatmaker_id, b.name, b.description, b.is_downloaded, b.is_deleted, b.created_at FROM beats_genres bg
 			JOIN beats b ON bg.beat_id = b.id
 			WHERE bg.genre LIKE $1
 			AND b.is_downloaded = true
@@ -163,7 +165,7 @@ func (s *store) GetBeatByParams(ctx context.Context, params core.BeatParams, see
 			OFFSET FLOOR(random() * (SELECT COUNT(*) FROM a))
 		)
 
-		SELECT beat_id, beatmaker_id, created_at, genre FROM b LIMIT 1`
+		SELECT beat_id, beatmaker_id, name, description, created_at, genre FROM b LIMIT 1`
 	beat = new(core.Beat)
 	genre = new(string)
 	err = s.DB.QueryRowContext(
@@ -173,6 +175,8 @@ func (s *store) GetBeatByParams(ctx context.Context, params core.BeatParams, see
 		seen).Scan(
 		&beat.ID,
 		&beat.BeatmakerID,
+		&beat.Name,
+		&beat.Description,
 		&beat.CreatedAt,
 		genre,
 	)
@@ -237,4 +241,68 @@ func (s *store) ClearUserSeenBeats(ctx context.Context, userID int) error {
 	}
 
 	return nil
+}
+
+func (s *store) GetBeatGenres(ctx context.Context, beatID int) (beatGenres []core.BeatGenre, err error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	stmt := `SELECT id, beat_id, genre
+	FROM beats_genres
+	WHERE beat_id = $1`
+
+	rows, err := s.DB.QueryContext(ctx, stmt, beatID)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var beatGenre core.BeatGenre
+		if err := rows.Scan(&beatGenre.ID, &beatGenre.BeatID, &beatGenre.Genre); err != nil {
+			return nil, err
+		}
+		beatGenres = append(beatGenres, beatGenre)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return beatGenres, nil
+}
+
+func (s *store) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p core.Pagination) (beats []core.Beat, total int, err error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	stmt := `SELECT id, beatmaker_id, path, name, description, is_downloaded, is_deleted, created_at, updated_at
+	FROM beats
+	WHERE beatmaker_id = $1 AND is_deleted = false AND is_downloaded = true
+	OFFSET $2
+	LIMIT $3`
+
+	rows, err := s.DB.QueryContext(ctx, stmt, beatmakerID, p.Offset, p.Limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	for rows.Next() {
+		total += 1
+		var beat core.Beat
+		if err := rows.Scan(
+			&beat.ID,
+			&beat.BeatmakerID,
+			&beat.Path,
+			&beat.Name,
+			&beat.Description,
+			&beat.IsDownloaded,
+			&beat.IsDeleted,
+			&beat.CreatedAt,
+			&beat.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		beats = append(beats, beat)
+	}
+
+	return beats, total, nil
 }

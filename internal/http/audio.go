@@ -11,12 +11,20 @@ import (
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
 )
 
+const (
+	upperLimit = 100
+)
+
 func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[string]string) {
 	ctx := req.Context()
 
 	id, err := strconv.ParseInt(params["id"], 10, 64)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
+		http.Error(w, core.ErrInvalidParams.Error(), http.StatusBadRequest)
+		return
+	} else if id < 1 {
+		logger.Log().Error(ctx, "id should be positive")
 		http.Error(w, core.ErrInvalidParams.Error(), http.StatusBadRequest)
 		return
 	}
@@ -75,7 +83,7 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			http.Error(w, core.ErrBeatNotFound.Error(), http.StatusNotFound)
 			return
 		}
 		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
@@ -91,7 +99,7 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 
 	apiBeatmaker := model.ToBeatmaker(beatmaker)
 
-	b, err := toJSON(model.ToBeat(beat, apiBeatmaker, genre))
+	b, err := toJSON(model.ToBeat(beat, apiBeatmaker, *genre))
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		http.Error(w, core.ErrUnavailable.Error(), http.StatusServiceUnavailable)
@@ -100,6 +108,70 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+
+	if _, err = w.Write(b); err != nil {
+		logger.Log().Error(ctx, err.Error())
+		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (r *Router) getBeatmakerBeats(w http.ResponseWriter, req *http.Request, params map[string]string) {
+	ctx := req.Context()
+
+	limit, err := strconv.ParseInt(req.URL.Query().Get("limit"), 10, 64)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		http.Error(w, core.ErrInvalidLimit.Error(), http.StatusBadRequest)
+		return
+	} else if limit > upperLimit || limit < 0 {
+		logger.Log().Debug(ctx, "limit should be less or equal than 100 and greater or equal than 0")
+		http.Error(w, core.ErrInvalidLimit.Error(), http.StatusBadRequest)
+		return
+	}
+
+	offset, err := strconv.ParseInt(req.URL.Query().Get("offset"), 10, 64)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		http.Error(w, core.ErrInvalidOffset.Error(), http.StatusBadRequest)
+		return
+	} else if offset < 0 {
+		logger.Log().Error(ctx, "offset should be greater or equal than 0")
+		http.Error(w, core.ErrInvalidOffset.Error(), http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.ParseInt(params["id"], 10, 64)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		http.Error(w, core.ErrInvalidID.Error(), http.StatusBadRequest)
+		return
+	} else if id < 1 {
+		logger.Log().Error(ctx, "id should be greater than 0")
+		http.Error(w, core.ErrInvalidID.Error(), http.StatusBadRequest)
+		return
+	}
+
+	p := core.Pagination{
+		Limit:  int(limit),
+		Offset: int(offset),
+	}
+
+	beats, beatsGenres, total, err := r.beatService.GetBeatsMetaByBeatmakerID(ctx, int(id), p)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	b, err := toJSON(model.ToGetBeatmakerBeatsResponse(beats, beatsGenres, p, total))
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		http.Error(w, core.ErrUnavailable.Error(), http.StatusServiceUnavailable)
+		return
+	}
 
 	if _, err = w.Write(b); err != nil {
 		logger.Log().Error(ctx, err.Error())

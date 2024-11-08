@@ -82,7 +82,7 @@ func New(ctx context.Context, cfg *config.Config) *App {
 	}
 
 	// gRPC server
-	gRPCApp := grpcapp.New(ctx, cfg, beatService)
+	gRPCApp := grpcapp.New(ctx, cfg, beatService, gRPCUserClient)
 
 	// HTTP server
 	httpApp := httpapp.New(ctx, cfg, beatService, gRPCUserClient)
