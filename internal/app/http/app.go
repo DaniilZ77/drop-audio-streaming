@@ -29,7 +29,7 @@ func New(
 	beatService core.BeatService,
 	grpcUserClient *userclient.Client,
 ) *App {
-	// creds, err := credentials.NewClientTLSFromFile(cfg.Cert, "")
+	// creds, err := credentials.NewClientTLSFromFile(cfg.Cert, "") nolint
 	// if err != nil {
 	// 	logger.Log().Fatal(ctx, "failed to create server TLS credentials: %v", err)
 	// }

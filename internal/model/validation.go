@@ -16,3 +16,10 @@ func ValidateUploadRequest(v *validator.Validator, req *audiov1.UploadRequest) {
 func ValidateGetBeatMeta(v *validator.Validator, req *audiov1.GetBeatMetaRequest) {
 	v.Check(validator.AtLeast(int(req.GetBeatId()), 1), "beat_id", "must be positive")
 }
+
+func ValidateGetBeatmakerBeats(v *validator.Validator, getBeatsParams GetBeatsParams, beatmakerID int) {
+	v.Check(validator.Between(getBeatsParams.Limit, 1, 100), "limit", "must be positive and less than or equal 100")
+	v.Check(validator.AtLeast(getBeatsParams.Offset, 0), "offset", "must be non-negative")
+	v.Check(validator.OneOf(getBeatsParams.Order, "asc", "desc"), "order", "must be one of acs or desc")
+	v.Check(validator.AtLeast(beatmakerID, 1), "beatmaker_id", "must be positive")
+}

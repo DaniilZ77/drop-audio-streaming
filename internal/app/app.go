@@ -46,7 +46,7 @@ func New(ctx context.Context, cfg *config.Config) *App {
 	}
 
 	// Minio connection
-	minio, err := minio.New(ctx, minio.MinioConfig{
+	mio, err := minio.New(ctx, minio.MinioConfig{
 		Password: cfg.DB.MinioPassword,
 		User:     cfg.DB.MinioUser,
 		Endpoint: cfg.DB.MinioEndpoint,
@@ -59,7 +59,7 @@ func New(ctx context.Context, cfg *config.Config) *App {
 
 	// Store
 	beatStore := beatstore.New(
-		minio,
+		mio,
 		pg,
 		cfg.DB.MinioBucket,
 		rdb,
@@ -90,7 +90,7 @@ func New(ctx context.Context, cfg *config.Config) *App {
 	return &App{
 		GRPCServer: gRPCApp,
 		PG:         pg,
-		M:          minio,
+		M:          mio,
 		HTTPServer: httpApp,
 		RDB:        rdb,
 	}

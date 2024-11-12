@@ -21,14 +21,14 @@ func New(beatStore core.BeatStorage, uploadURLTTL int) core.BeatService {
 	return &service{beatStore: beatStore, uploadURLTTL: uploadURLTTL}
 }
 
-func (s *service) GetBeat(ctx context.Context, beatID int64, start int64, end *int64) (io.ReadCloser, int64, string, error) {
-	beat, err := s.beatStore.GetBeatByID(ctx, beatID)
+func (s *service) GetBeatFromS3(ctx context.Context, beatID, start int64, end *int64) (obj io.ReadCloser, size int64, contentType string, err error) {
+	beat, err := s.beatStore.GetBeatByID(ctx, beatID, core.True)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, 0, "", err
 	}
 
-	obj, size, contentType, err := s.beatStore.GetBeatFromS3(ctx, beat.Path, start, end)
+	obj, size, contentType, err = s.beatStore.GetBeatFromS3(ctx, beat.Path, start, end)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, 0, "", err
@@ -43,6 +43,7 @@ func (s *service) WritePartialContent(ctx context.Context, r io.Reader, w io.Wri
 	data := make(chan []byte)
 	var wg sync.WaitGroup
 	wg.Add(1)
+	logger.Log().Debug(ctx, "beat stream started")
 
 	defer logger.Log().Debug(ctx, "beat stream ended")
 	defer close(data)
@@ -67,7 +68,12 @@ func (s *service) WritePartialContent(ctx context.Context, r io.Reader, w io.Wri
 	}()
 
 	go func() {
-		for chunk := range data {
+		for {
+			chunk, ok := <-data
+			if !ok && chunk == nil {
+				return
+			}
+
 			if _, err := w.Write(chunk); err != nil {
 				return
 			}
@@ -84,14 +90,14 @@ func (s *service) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.
 	_, err = s.beatStore.AddBeat(ctx, beat, beatGenre)
 	if err != nil {
 		if errors.Is(err, core.ErrBeatExists) {
-			beat, err := s.beatStore.GetBeatByID(ctx, int64(beat.ID))
+			beat, err := s.beatStore.GetBeatByID(ctx, int64(beat.ID), core.Any)
 			if err != nil {
 				return "", err
 			}
 
 			return beat.Path, nil
 		}
-		return "", nil
+		return "", err
 	}
 
 	return beatPath, err
@@ -106,20 +112,20 @@ func (s *service) GetUploadURL(ctx context.Context, beatPath string) (string, er
 	return path, nil
 }
 
-func (s *service) GetBeatByParams(ctx context.Context, userID int, params core.BeatParams) (beat *core.Beat, genre *string, err error) {
+func (s *service) GetBeatByFilter(ctx context.Context, userID int, filter core.FeedFilter) (beat *core.Beat, genre *string, err error) {
 	beats, err := s.beatStore.GetUserSeenBeats(ctx, userID)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	beat, genre, err = s.beatStore.GetBeatByParams(ctx, params, beats)
+	beat, genre, err = s.beatStore.GetBeatByFilter(ctx, filter, beats)
 	if err != nil {
 		if errors.Is(err, core.ErrBeatNotFound) {
-			if err = s.beatStore.ClearUserSeenBeats(ctx, userID); err != nil {
+			if err := s.beatStore.ClearUserSeenBeats(ctx, userID); err != nil {
 				return nil, nil, err
 			}
 
-			beat, genre, err = s.beatStore.GetBeatByParams(ctx, params, []string{})
+			beat, genre, err = s.beatStore.GetBeatByFilter(ctx, filter, []string{})
 			if err != nil {
 				return nil, nil, err
 			}
@@ -128,19 +134,19 @@ func (s *service) GetBeatByParams(ctx context.Context, userID int, params core.B
 		}
 	}
 
-	if err = s.beatStore.PopUserSeenBeat(ctx, userID); err != nil {
+	if err := s.beatStore.PopUserSeenBeat(ctx, userID); err != nil {
 		return nil, nil, err
 	}
 
-	if err = s.beatStore.AddUserSeenBeat(ctx, userID, beat.ID); err != nil {
+	if err := s.beatStore.AddUserSeenBeat(ctx, userID, beat.ID); err != nil {
 		return nil, nil, err
 	}
 
 	return beat, genre, nil
 }
 
-func (s *service) GetBeatMeta(ctx context.Context, beatID int) (beat *core.Beat, beatGenres []core.BeatGenre, err error) {
-	beat, err = s.beatStore.GetBeatByID(ctx, int64(beatID))
+func (s *service) GetBeat(ctx context.Context, beatID int) (beat *core.Beat, beatGenres []core.BeatGenre, err error) {
+	beat, err = s.beatStore.GetBeatByID(ctx, int64(beatID), core.True)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, nil, err
@@ -155,7 +161,7 @@ func (s *service) GetBeatMeta(ctx context.Context, beatID int) (beat *core.Beat,
 	return beat, beatGenres, nil
 }
 
-func (s *service) GetBeatsMetaByBeatmakerID(ctx context.Context, beatmakerID int, p core.Pagination) (beats []core.Beat, beatsGenres [][]core.BeatGenre, total int, err error) {
+func (s *service) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p core.GetBeatsParams) (beats []core.Beat, beatsGenres [][]core.BeatGenre, total int, err error) {
 	beats, total, err = s.beatStore.GetBeatsByBeatmakerID(ctx, beatmakerID, p)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())

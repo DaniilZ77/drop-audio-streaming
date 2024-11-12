@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/minio"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/postgres"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/redis"
@@ -33,17 +35,25 @@ func New(
 	return &store{m, pg, bucketName, rdb, userHistory}
 }
 
-func (s *store) GetBeatByID(ctx context.Context, beatID int64) (*core.Beat, error) {
+func (s *store) GetBeatByID(ctx context.Context, beatID int64, param core.IsDownloaded) (*core.Beat, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
 	var beat core.Beat
 
+	isDownloaded := []bool{true}
+	if param == core.False {
+		isDownloaded = []bool{false}
+	} else if param == core.Any {
+		isDownloaded = append(isDownloaded, false)
+	}
+
+	logger.Log().Debug(ctx, "%v", isDownloaded)
+
 	stmt := `SELECT id, beatmaker_id, path, name, description, is_downloaded, is_deleted, created_at, updated_at
 	FROM beats
-	WHERE id = $1 AND is_downloaded = true AND is_deleted = false`
-
-	err := s.DB.QueryRowContext(ctx, stmt, beatID).Scan(
+	WHERE id = $1 AND is_downloaded = ANY($2::boolean[]) AND is_deleted = false`
+	err := s.DB.QueryRowContext(ctx, stmt, beatID, isDownloaded).Scan(
 		&beat.ID,
 		&beat.BeatmakerID,
 		&beat.Path,
@@ -63,7 +73,7 @@ func (s *store) GetBeatByID(ctx context.Context, beatID int64) (*core.Beat, erro
 	return &beat, nil
 }
 
-func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int64, end *int64) (*miniolib.Object, int64, string, error) {
+func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int64, end *int64) (obj io.ReadCloser, size int64, contentType string, err error) {
 	objInfo, err := s.Minio.Client.StatObject(ctx, s.bucketName, beatPath, miniolib.StatObjectOptions{})
 	if err != nil {
 		return nil, 0, "", err
@@ -79,10 +89,12 @@ func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int64,
 
 	opts := miniolib.GetObjectOptions{}
 	if start != 0 || *end != -1 {
-		opts.SetRange(start, *end)
+		if err := opts.SetRange(start, *end); err != nil {
+			return nil, 0, "", err
+		}
 	}
 
-	obj, err := s.Minio.Client.GetObject(ctx, s.bucketName, beatPath, opts)
+	obj, err = s.Minio.Client.GetObject(ctx, s.bucketName, beatPath, opts)
 	if err != nil {
 		return nil, 0, "", err
 	}
@@ -115,7 +127,9 @@ func (s *store) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.Be
 		stmt,
 		beat.ID,
 		beat.BeatmakerID,
-		beat.Path).Scan(&beatID)
+		beat.Path,
+		beat.Name,
+		beat.Description).Scan(&beatID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
@@ -127,7 +141,7 @@ func (s *store) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.Be
 	stmt = `INSERT INTO beats_genres (beat_id, genre)
 	VALUES ($1, $2)`
 	for _, bg := range beatGenre {
-		err = tx.QueryRowContext(ctx, stmt, bg.BeatID, bg.Genre).Err()
+		err = tx.QueryRowContext(ctx, stmt, beatID, bg.Genre).Err()
 		if err != nil {
 			return 0, err
 		}
@@ -148,7 +162,7 @@ func (s *store) GetPresignedURL(ctx context.Context, path string, expiry time.Du
 	return u.String(), nil
 }
 
-func (s *store) GetBeatByParams(ctx context.Context, params core.BeatParams, seen []string) (beat *core.Beat, genre *string, err error) {
+func (s *store) GetBeatByFilter(ctx context.Context, filter core.FeedFilter, seen []string) (beat *core.Beat, genre *string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
@@ -171,7 +185,7 @@ func (s *store) GetBeatByParams(ctx context.Context, params core.BeatParams, see
 	err = s.DB.QueryRowContext(
 		ctx,
 		stmt,
-		params.Genre+"%",
+		filter.Genre+"%",
 		seen).Scan(
 		&beat.ID,
 		&beat.BeatmakerID,
@@ -202,7 +216,7 @@ func (s *store) GetUserSeenBeats(ctx context.Context, userID int) ([]string, err
 	return res, nil
 }
 
-func (s *store) AddUserSeenBeat(ctx context.Context, userID int, beatID int) error {
+func (s *store) AddUserSeenBeat(ctx context.Context, userID, beatID int) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
@@ -271,15 +285,40 @@ func (s *store) GetBeatGenres(ctx context.Context, beatID int) (beatGenres []cor
 	return beatGenres, nil
 }
 
-func (s *store) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p core.Pagination) (beats []core.Beat, total int, err error) {
+func (s *store) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p core.GetBeatsParams) (beats []core.Beat, total int, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	stmt := `SELECT id, beatmaker_id, path, name, description, is_downloaded, is_deleted, created_at, updated_at
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback() // nolint
+		} else {
+			tx.Commit() // nolint
+		}
+	}()
+
+	stmt := `SELECT COUNT(*)
+	FROM beats
+	WHERE beatmaker_id = $1 AND is_downloaded = true AND is_deleted = false`
+
+	err = s.DB.QueryRowContext(ctx, stmt, beatmakerID).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	stmt = fmt.Sprintf(`SELECT id, beatmaker_id, path, name, description, is_downloaded, is_deleted, created_at, updated_at
 	FROM beats
 	WHERE beatmaker_id = $1 AND is_deleted = false AND is_downloaded = true
+	ORDER BY updated_at %s
 	OFFSET $2
-	LIMIT $3`
+	LIMIT $3`, p.Order)
+
+	logger.Log().Debug(ctx, "order: %s", p.Order)
 
 	rows, err := s.DB.QueryContext(ctx, stmt, beatmakerID, p.Offset, p.Limit)
 	if err != nil {
@@ -287,7 +326,6 @@ func (s *store) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p co
 	}
 
 	for rows.Next() {
-		total += 1
 		var beat core.Beat
 		if err := rows.Scan(
 			&beat.ID,
@@ -302,6 +340,10 @@ func (s *store) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p co
 			return nil, 0, err
 		}
 		beats = append(beats, beat)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, nil
 	}
 
 	return beats, total, nil

@@ -19,7 +19,7 @@ type (
 
 	HTTP struct {
 		GRPCPort           string
-		GRPCClientRetries  int
+		GRPCClientRetries  uint
 		GRPCClientTimeout  time.Duration
 		GRPCUserClientAddr string
 		HTTPPort           string
@@ -92,7 +92,7 @@ func NewConfig() (*Config, error) {
 	jwtSecret := flag.String("jwt_secret", "secret", "jwt secret")
 
 	// grpc client
-	grpcClientRetries := flag.Int("grpc_client_retries", 1, "grpc client retries")
+	grpcClientRetries := flag.Uint("grpc_client_retries", 1, "grpc client retries")
 	grpcClientTimeout := flag.Duration("grpc_client_timeout", 2*time.Second, "grpc client timeout")
 	grpcUserClientAddr := flag.String("grpc_user_client_addr", "", "grpc user client addr")
 

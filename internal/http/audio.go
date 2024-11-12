@@ -9,10 +9,7 @@ import (
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
-)
-
-const (
-	upperLimit = 100
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model/validator"
 )
 
 func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[string]string) {
@@ -21,11 +18,11 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 	id, err := strconv.ParseInt(params["id"], 10, 64)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		http.Error(w, core.ErrInvalidParams.Error(), http.StatusBadRequest)
+		errorResponse(ctx, w, http.StatusBadRequest, core.ErrInvalidID, nil)
 		return
 	} else if id < 1 {
 		logger.Log().Error(ctx, "id should be positive")
-		http.Error(w, core.ErrInvalidParams.Error(), http.StatusBadRequest)
+		errorResponse(ctx, w, http.StatusBadRequest, core.ErrInvalidID, nil)
 		return
 	}
 
@@ -33,23 +30,23 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrInvalidRange) {
-			http.Error(w, core.ErrInvalidRange.Error(), http.StatusBadRequest)
+			errorResponse(ctx, w, http.StatusBadRequest, core.ErrInvalidRange, nil)
 			return
 		}
-		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
+		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
 		return
 	}
 
 	logger.Log().Debug(ctx, "start: %d; end: %d", start, end)
 
-	beat, size, contentType, err := r.beatService.GetBeat(ctx, id, start, &end)
+	beat, size, contentType, err := r.beatService.GetBeatFromS3(ctx, id, start, &end)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatNotFound) {
-			http.Error(w, core.ErrBeatNotFound.Error(), http.StatusNotFound)
+			errorResponse(ctx, w, http.StatusNotFound, core.ErrBeatNotFound, nil)
 			return
 		}
-		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
+		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
 		return
 	}
 	defer beat.Close()
@@ -64,7 +61,7 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 
 	if err = r.beatService.WritePartialContent(ctx, beat, w, r.chunkSize); err != nil {
 		logger.Log().Error(ctx, err.Error())
-		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
+		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
 	}
 }
 
@@ -74,26 +71,26 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 	userID, err := getUserIDFromContext(ctx)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
+		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
 		return
 	}
 
-	beatParams := model.ToCoreBeatParams(req.URL.Query())
-	beat, genre, err := r.beatService.GetBeatByParams(ctx, userID, beatParams)
+	feedFilter := model.ToCoreFeedFilter(req.URL.Query())
+	beat, genre, err := r.beatService.GetBeatByFilter(ctx, userID, feedFilter)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatNotFound) {
-			http.Error(w, core.ErrBeatNotFound.Error(), http.StatusNotFound)
+			errorResponse(ctx, w, http.StatusNotFound, core.ErrBeatNotFound, nil)
 			return
 		}
-		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
+		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
 		return
 	}
 
 	beatmaker, err := r.userClient.GetUserByID(ctx, beat.BeatmakerID)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
+		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
 		return
 	}
 
@@ -102,7 +99,7 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 	b, err := toJSON(model.ToBeat(beat, apiBeatmaker, *genre))
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		http.Error(w, core.ErrUnavailable.Error(), http.StatusServiceUnavailable)
+		errorResponse(ctx, w, http.StatusServiceUnavailable, core.ErrUnavailable, nil)
 		return
 	}
 
@@ -111,70 +108,56 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 
 	if _, err = w.Write(b); err != nil {
 		logger.Log().Error(ctx, err.Error())
-		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
+		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
 	}
 }
 
 func (r *Router) getBeatmakerBeats(w http.ResponseWriter, req *http.Request, params map[string]string) {
 	ctx := req.Context()
 
-	limit, err := strconv.ParseInt(req.URL.Query().Get("limit"), 10, 64)
-	if err != nil {
+	var getBeatsParams model.GetBeatsParams
+	if err := decoder.Decode(&getBeatsParams, req.URL.Query()); err != nil {
 		logger.Log().Error(ctx, err.Error())
-		http.Error(w, core.ErrInvalidLimit.Error(), http.StatusBadRequest)
-		return
-	} else if limit > upperLimit || limit < 0 {
-		logger.Log().Debug(ctx, "limit should be less or equal than 100 and greater or equal than 0")
-		http.Error(w, core.ErrInvalidLimit.Error(), http.StatusBadRequest)
-		return
-	}
-
-	offset, err := strconv.ParseInt(req.URL.Query().Get("offset"), 10, 64)
-	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		http.Error(w, core.ErrInvalidOffset.Error(), http.StatusBadRequest)
-		return
-	} else if offset < 0 {
-		logger.Log().Error(ctx, "offset should be greater or equal than 0")
-		http.Error(w, core.ErrInvalidOffset.Error(), http.StatusBadRequest)
+		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
 		return
 	}
 
 	id, err := strconv.ParseInt(params["id"], 10, 64)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		http.Error(w, core.ErrInvalidID.Error(), http.StatusBadRequest)
-		return
-	} else if id < 1 {
-		logger.Log().Error(ctx, "id should be greater than 0")
-		http.Error(w, core.ErrInvalidID.Error(), http.StatusBadRequest)
+		errorResponse(ctx, w, http.StatusBadRequest, core.ErrInvalidID, nil)
 		return
 	}
 
-	p := core.Pagination{
-		Limit:  int(limit),
-		Offset: int(offset),
+	v := validator.New()
+	model.ValidateGetBeatmakerBeats(v, getBeatsParams, int(id))
+	if !v.Valid() {
+		logger.Log().Debug(ctx, "%+v", v.Errors)
+		errorResponse(ctx, w, http.StatusBadRequest, core.ErrValidationFailed, []interface{}{model.ToValidationErrors(v)})
+		return
 	}
 
-	beats, beatsGenres, total, err := r.beatService.GetBeatsMetaByBeatmakerID(ctx, int(id), p)
+	coreGetBeatParams := getBeatsParams.ToCoreGetBeatsParams()
+
+	beats, beatsGenres, total, err := r.beatService.GetBeatsByBeatmakerID(ctx, int(id), coreGetBeatParams)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
+		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	b, err := toJSON(model.ToGetBeatmakerBeatsResponse(beats, beatsGenres, p, total))
+	b, err := toJSON(model.ToGetBeatmakerBeatsResponse(beats, beatsGenres, coreGetBeatParams, total))
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		http.Error(w, core.ErrUnavailable.Error(), http.StatusServiceUnavailable)
+		errorResponse(ctx, w, http.StatusServiceUnavailable, core.ErrUnavailable, nil)
 		return
 	}
 
 	if _, err = w.Write(b); err != nil {
 		logger.Log().Error(ctx, err.Error())
-		http.Error(w, core.ErrInternal.Error(), http.StatusInternalServerError)
+		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
 	}
 }

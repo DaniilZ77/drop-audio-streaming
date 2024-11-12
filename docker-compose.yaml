@@ -6,8 +6,8 @@ services:
     env_file:
       - .env
     ports:
-      - "8080:8080"
-      - "50051:50051"
+      - "50052:50052"
+      - "8081:8081"
     networks:
       - drop-audio-streaming
     depends_on:
@@ -47,7 +47,7 @@ services:
     container_name: redis
     restart: always
     environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     networks:
       - drop-audio-streaming
     volumes:
@@ -77,8 +77,29 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+      MINIO_NOTIFY_POSTGRES_ENABLE_PRIMARY: on
+      MINIO_NOTIFY_POSTGRES_FORMAT_PRIMARY: access
+      MINIO_NOTIFY_POSTGRES_TABLE_PRIMARY: ${MINIO_EVENTS_TABLE}
+      MINIO_NOTIFY_POSTGRES_CONNECTION_STRING_PRIMARY: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
     command: server --console-address ":8090" /var/lib/minio/data
-
+  
+  mc:
+    image: minio/mc
+    container_name: mc
+    depends_on:
+      - minio
+    env_file:
+      - .env
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc config host add myminio http://${MINIO_ENDPOINT} ${MINIO_USER} ${MINIO_PASSWORD}) do echo '...waiting...' && sleep 1; done;
+      /usr/bin/mc mb --ignore-existing myminio/${MINIO_BUCKET};
+      /usr/bin/mc event remove --event put myminio/${MINIO_BUCKET} arn:minio:sqs::PRIMARY:postgresql;
+      /usr/bin/mc event add --event put myminio/${MINIO_BUCKET} arn:minio:sqs::PRIMARY:postgresql;
+      exit 0;
+      "
+    networks:
+      - drop-audio-streaming
 
 volumes:
   postgres-data:

@@ -9,8 +9,12 @@ import (
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
 	"github.com/golang-jwt/jwt"
+	"github.com/gorilla/schema"
 )
+
+var decoder = schema.NewDecoder()
 
 func validToken(ctx context.Context, tokenString, secret string) (*int, error) {
 	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
@@ -91,4 +95,23 @@ func toJSON(v interface{}) ([]byte, error) {
 	}
 
 	return b, nil
+}
+
+func errorResponse(ctx context.Context, w http.ResponseWriter, status int, err error, details []interface{}) {
+	if details == nil {
+		details = []interface{}{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	b, err := toJSON(model.ToErrorResponse(err, details))
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return
+	}
+	if _, err := w.Write(b); err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return
+	}
 }

@@ -53,11 +53,11 @@ func New(ctx context.Context, config MinioConfig, opts ...Option) (*Minio, error
 		return nil, err
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
 	var exists bool
 	for m.connAttempts > 0 {
-		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-		defer cancel()
-
 		exists, err = m.Client.BucketExists(ctx, config.Bucket)
 		if err == nil {
 			break

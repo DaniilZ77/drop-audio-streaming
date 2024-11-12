@@ -62,7 +62,7 @@ func (s *server) GetBeatMeta(ctx context.Context, req *audiov1.GetBeatMetaReques
 		return nil, toGRPCError(v)
 	}
 
-	beat, beatGenres, err := s.beatService.GetBeatMeta(ctx, int(req.GetBeatId()))
+	beat, beatGenres, err := s.beatService.GetBeat(ctx, int(req.GetBeatId()))
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatNotFound) {
