@@ -50,13 +50,14 @@ func (s *store) GetBeatByID(ctx context.Context, beatID int64, param core.IsDown
 
 	logger.Log().Debug(ctx, "%v", isDownloaded)
 
-	stmt := `SELECT id, beatmaker_id, path, name, description, is_downloaded, is_deleted, created_at, updated_at
+	stmt := `SELECT id, beatmaker_id, file_path, image_path, name, description, is_downloaded, is_deleted, created_at, updated_at
 	FROM beats
 	WHERE id = $1 AND is_downloaded = ANY($2::boolean[]) AND is_deleted = false`
 	err := s.DB.QueryRowContext(ctx, stmt, beatID, isDownloaded).Scan(
 		&beat.ID,
 		&beat.BeatmakerID,
-		&beat.Path,
+		&beat.FilePath,
+		&beat.ImagePath,
 		&beat.Name,
 		&beat.Description,
 		&beat.IsDownloaded,
@@ -119,15 +120,16 @@ func (s *store) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.Be
 		}
 	}()
 
-	stmt := `INSERT INTO beats (id, beatmaker_id, path, name, description)
-	VALUES ($1, $2, $3, $4, $5)
+	stmt := `INSERT INTO beats (id, beatmaker_id, file_path, image_path, name, description)
+	VALUES ($1, $2, $3, $4, $5, $6)
 	RETURNING id`
 	err = tx.QueryRowContext(
 		ctx,
 		stmt,
 		beat.ID,
 		beat.BeatmakerID,
-		beat.Path,
+		beat.FilePath,
+		beat.ImagePath,
 		beat.Name,
 		beat.Description).Scan(&beatID)
 	if err != nil {
@@ -168,7 +170,7 @@ func (s *store) GetBeatByFilter(ctx context.Context, filter core.FeedFilter, see
 
 	stmt :=
 		`WITH a AS (
-			SELECT bg.id, bg.beat_id, bg.genre, b.beatmaker_id, b.name, b.description, b.is_downloaded, b.is_deleted, b.created_at FROM beats_genres bg
+			SELECT bg.id, bg.beat_id, bg.genre, b.beatmaker_id, b.image_path, b.name, b.description, b.is_downloaded, b.is_deleted, b.created_at FROM beats_genres bg
 			JOIN beats b ON bg.beat_id = b.id
 			WHERE bg.genre LIKE $1
 			AND b.is_downloaded = true
@@ -179,7 +181,7 @@ func (s *store) GetBeatByFilter(ctx context.Context, filter core.FeedFilter, see
 			OFFSET FLOOR(random() * (SELECT COUNT(*) FROM a))
 		)
 
-		SELECT beat_id, beatmaker_id, name, description, created_at, genre FROM b LIMIT 1`
+		SELECT beat_id, beatmaker_id, image_path, name, description, created_at, genre FROM b LIMIT 1`
 	beat = new(core.Beat)
 	genre = new(string)
 	err = s.DB.QueryRowContext(
@@ -189,6 +191,7 @@ func (s *store) GetBeatByFilter(ctx context.Context, filter core.FeedFilter, see
 		seen).Scan(
 		&beat.ID,
 		&beat.BeatmakerID,
+		&beat.ImagePath,
 		&beat.Name,
 		&beat.Description,
 		&beat.CreatedAt,
@@ -311,7 +314,7 @@ func (s *store) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p co
 		return nil, 0, err
 	}
 
-	stmt = fmt.Sprintf(`SELECT id, beatmaker_id, path, name, description, is_downloaded, is_deleted, created_at, updated_at
+	stmt = fmt.Sprintf(`SELECT id, beatmaker_id, file_path, image_path, name, description, is_downloaded, is_deleted, created_at, updated_at
 	FROM beats
 	WHERE beatmaker_id = $1 AND is_deleted = false AND is_downloaded = true
 	ORDER BY updated_at %s
@@ -330,7 +333,8 @@ func (s *store) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p co
 		if err := rows.Scan(
 			&beat.ID,
 			&beat.BeatmakerID,
-			&beat.Path,
+			&beat.FilePath,
+			&beat.ImagePath,
 			&beat.Name,
 			&beat.Description,
 			&beat.IsDownloaded,

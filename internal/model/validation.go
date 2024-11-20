@@ -13,7 +13,7 @@ func ValidateUploadRequest(v *validator.Validator, req *audiov1.UploadRequest) {
 	v.Check(validator.Between(len(req.GetDescription()), 0, 512), "description", "must have length between 0 and 512")
 }
 
-func ValidateGetBeatMeta(v *validator.Validator, req *audiov1.GetBeatMetaRequest) {
+func ValidateGetBeat(v *validator.Validator, req *audiov1.GetBeatRequest) {
 	v.Check(validator.AtLeast(int(req.GetBeatId()), 1), "beat_id", "must be positive")
 }
 

@@ -50,12 +50,12 @@
     },
     "/v1/audio/{beatId}": {
       "get": {
-        "operationId": "AudioService_GetBeatMeta",
+        "operationId": "AudioService_GetBeat",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/audioGetBeatMetaResponse"
+              "$ref": "#/definitions/audioGetBeatResponse"
             }
           },
           "default": {
@@ -96,7 +96,7 @@
         }
       }
     },
-    "audioGetBeatMetaResponse": {
+    "audioGetBeatResponse": {
       "type": "object",
       "properties": {
         "id": {
@@ -148,7 +148,10 @@
     "audioUploadResponse": {
       "type": "object",
       "properties": {
-        "beatUploadUrl": {
+        "fileUploadUrl": {
+          "type": "string"
+        },
+        "imageUploadUrl": {
           "type": "string"
         }
       }

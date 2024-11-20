@@ -194,6 +194,17 @@
         }
       }
     },
+    "userUpdateEmail": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        }
+      }
+    },
     "userUpdatePassword": {
       "type": "object",
       "properties": {
@@ -205,6 +216,17 @@
         }
       }
     },
+    "userUpdateTelephone": {
+      "type": "object",
+      "properties": {
+        "telephone": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        }
+      }
+    },
     "userUpdateUser": {
       "type": "object",
       "properties": {
@@ -212,7 +234,7 @@
           "type": "string"
         },
         "email": {
-          "type": "string"
+          "$ref": "#/definitions/userUpdateEmail"
         },
         "firstName": {
           "type": "string"
@@ -224,7 +246,7 @@
           "type": "string"
         },
         "telephone": {
-          "type": "string"
+          "$ref": "#/definitions/userUpdateTelephone"
         },
         "pseudonym": {
           "type": "string"
@@ -278,6 +300,14 @@
         },
         "isEmailVerified": {
           "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     }

@@ -26,7 +26,7 @@ func TestGetBeatFromS3_Success(t *testing.T) {
 	beatService := New(beatStorage, 0)
 
 	beat := &core.Beat{
-		Path: "path/to/beat1",
+		FilePath: "path/to/beat1",
 	}
 	var start, end int64 = 0, 100
 
@@ -35,7 +35,7 @@ func TestGetBeatFromS3_Success(t *testing.T) {
 		Return(beat, nil).
 		Once()
 	beatStorage.EXPECT().
-		GetBeatFromS3(mock.Anything, beat.Path, start, &end).
+		GetBeatFromS3(mock.Anything, beat.FilePath, start, &end).
 		Return(io.NopCloser(strings.NewReader("Hello, World")), 200, "application/json", nil).
 		Once()
 

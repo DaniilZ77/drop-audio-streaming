@@ -24,7 +24,7 @@ type (
 
 	BeatService interface {
 		GetBeatFromS3(ctx context.Context, beatID int64, start int64, end *int64) (obj io.ReadCloser, size int64, contentType string, err error)
-		AddBeat(ctx context.Context, beat Beat, beatGenre []BeatGenre) (beatPath string, err error)
+		AddBeat(ctx context.Context, beat Beat, beatGenre []BeatGenre) (beatPath, imagePath string, err error)
 		WritePartialContent(ctx context.Context, r io.Reader, w io.Writer, chunkSize int) error
 		GetUploadURL(ctx context.Context, beatPath string) (url string, err error)
 		GetBeatByFilter(ctx context.Context, userID int, params FeedFilter) (beat *Beat, genre *string, err error)
@@ -45,7 +45,8 @@ type (
 	Beat struct {
 		ID           int
 		BeatmakerID  int
-		Path         string
+		FilePath     string
+		ImagePath    string
 		Name         string
 		Description  string
 		IsDownloaded bool

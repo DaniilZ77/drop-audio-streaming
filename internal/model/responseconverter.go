@@ -12,6 +12,7 @@ type (
 	Beat struct {
 		ID          int       `json:"id"`
 		Beatmaker   Beatmaker `json:"beatmaker"`
+		Image       string    `json:"image"`
 		Name        string    `json:"name"`
 		Description string    `json:"description"`
 		Genre       string    `json:"genre"`
@@ -89,13 +90,13 @@ func ToGetBeatmakerBeatsResponse(beats []core.Beat, genres [][]core.BeatGenre, p
 	}
 }
 
-func ToGetBeatMetaResponse(beat *core.Beat, beatmaker *userv1.GetUserResponse, beatGenres []core.BeatGenre) *audiov1.GetBeatMetaResponse {
+func ToGetBeatResponse(beat *core.Beat, beatmaker *userv1.GetUserResponse, beatGenres []core.BeatGenre) *audiov1.GetBeatResponse {
 	genres := make([]string, 0)
 	for _, genre := range beatGenres {
 		genres = append(genres, genre.Genre)
 	}
 
-	return &audiov1.GetBeatMetaResponse{
+	return &audiov1.GetBeatResponse{
 		Id:          int64(beat.ID),
 		Name:        beat.Name,
 		Description: beat.Description,
@@ -108,12 +109,13 @@ func ToGetBeatMetaResponse(beat *core.Beat, beatmaker *userv1.GetUserResponse, b
 	}
 }
 
-func ToBeat(beat *core.Beat, beatmaker Beatmaker, genre string) Beat {
+func ToBeat(beat *core.Beat, beatmaker Beatmaker, genre, image string) Beat {
 	return Beat{
 		ID:          beat.ID,
 		Beatmaker:   beatmaker,
 		Name:        beat.Name,
 		Description: beat.Description,
+		Image:       image,
 		Genre:       genre,
 		CreatedAt:   beat.CreatedAt,
 	}

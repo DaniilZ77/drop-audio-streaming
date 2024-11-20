@@ -88,6 +88,13 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 		return
 	}
 
+	imageURL, err := r.beatService.GetUploadURL(ctx, beat.ImagePath)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
+		return
+	}
+
 	beatmaker, err := r.userClient.GetUserByID(ctx, beat.BeatmakerID)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
@@ -97,7 +104,7 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 
 	apiBeatmaker := model.ToBeatmaker(beatmaker)
 
-	b, err := toJSON(model.ToBeat(beat, apiBeatmaker, *genre))
+	b, err := toJSON(model.ToBeat(beat, apiBeatmaker, *genre, imageURL))
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		errorResponse(ctx, w, http.StatusServiceUnavailable, core.ErrUnavailable, nil)

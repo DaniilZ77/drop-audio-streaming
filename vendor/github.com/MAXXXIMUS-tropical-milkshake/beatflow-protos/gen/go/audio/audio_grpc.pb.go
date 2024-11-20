@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AudioService_Upload_FullMethodName      = "/audio.AudioService/Upload"
-	AudioService_GetBeatMeta_FullMethodName = "/audio.AudioService/GetBeatMeta"
+	AudioService_Upload_FullMethodName  = "/audio.AudioService/Upload"
+	AudioService_GetBeat_FullMethodName = "/audio.AudioService/GetBeat"
 )
 
 // AudioServiceClient is the client API for AudioService service.
@@ -28,7 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AudioServiceClient interface {
 	Upload(ctx context.Context, in *UploadRequest, opts ...grpc.CallOption) (*UploadResponse, error)
-	GetBeatMeta(ctx context.Context, in *GetBeatMetaRequest, opts ...grpc.CallOption) (*GetBeatMetaResponse, error)
+	GetBeat(ctx context.Context, in *GetBeatRequest, opts ...grpc.CallOption) (*GetBeatResponse, error)
 }
 
 type audioServiceClient struct {
@@ -49,10 +49,10 @@ func (c *audioServiceClient) Upload(ctx context.Context, in *UploadRequest, opts
 	return out, nil
 }
 
-func (c *audioServiceClient) GetBeatMeta(ctx context.Context, in *GetBeatMetaRequest, opts ...grpc.CallOption) (*GetBeatMetaResponse, error) {
+func (c *audioServiceClient) GetBeat(ctx context.Context, in *GetBeatRequest, opts ...grpc.CallOption) (*GetBeatResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetBeatMetaResponse)
-	err := c.cc.Invoke(ctx, AudioService_GetBeatMeta_FullMethodName, in, out, cOpts...)
+	out := new(GetBeatResponse)
+	err := c.cc.Invoke(ctx, AudioService_GetBeat_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (c *audioServiceClient) GetBeatMeta(ctx context.Context, in *GetBeatMetaReq
 // for forward compatibility.
 type AudioServiceServer interface {
 	Upload(context.Context, *UploadRequest) (*UploadResponse, error)
-	GetBeatMeta(context.Context, *GetBeatMetaRequest) (*GetBeatMetaResponse, error)
+	GetBeat(context.Context, *GetBeatRequest) (*GetBeatResponse, error)
 	mustEmbedUnimplementedAudioServiceServer()
 }
 
@@ -78,8 +78,8 @@ type UnimplementedAudioServiceServer struct{}
 func (UnimplementedAudioServiceServer) Upload(context.Context, *UploadRequest) (*UploadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Upload not implemented")
 }
-func (UnimplementedAudioServiceServer) GetBeatMeta(context.Context, *GetBeatMetaRequest) (*GetBeatMetaResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBeatMeta not implemented")
+func (UnimplementedAudioServiceServer) GetBeat(context.Context, *GetBeatRequest) (*GetBeatResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBeat not implemented")
 }
 func (UnimplementedAudioServiceServer) mustEmbedUnimplementedAudioServiceServer() {}
 func (UnimplementedAudioServiceServer) testEmbeddedByValue()                      {}
@@ -120,20 +120,20 @@ func _AudioService_Upload_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AudioService_GetBeatMeta_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetBeatMetaRequest)
+func _AudioService_GetBeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBeatRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AudioServiceServer).GetBeatMeta(ctx, in)
+		return srv.(AudioServiceServer).GetBeat(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AudioService_GetBeatMeta_FullMethodName,
+		FullMethod: AudioService_GetBeat_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AudioServiceServer).GetBeatMeta(ctx, req.(*GetBeatMetaRequest))
+		return srv.(AudioServiceServer).GetBeat(ctx, req.(*GetBeatRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -150,8 +150,8 @@ var AudioService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AudioService_Upload_Handler,
 		},
 		{
-			MethodName: "GetBeatMeta",
-			Handler:    _AudioService_GetBeatMeta_Handler,
+			MethodName: "GetBeat",
+			Handler:    _AudioService_GetBeat_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

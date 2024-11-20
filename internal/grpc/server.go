@@ -36,7 +36,7 @@ func (s *server) Upload(ctx context.Context, req *audiov1.UploadRequest) (*audio
 	beat := model.ToCoreBeat(req)
 	beatGenre := model.ToCoreBeatGenre(req)
 
-	beatPath, err := s.beatService.AddBeat(ctx, beat, beatGenre)
+	filePath, imagePath, err := s.beatService.AddBeat(ctx, beat, beatGenre)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatExists) {
@@ -45,18 +45,24 @@ func (s *server) Upload(ctx context.Context, req *audiov1.UploadRequest) (*audio
 		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
 	}
 
-	url, err := s.beatService.GetUploadURL(ctx, beatPath)
+	fileURL, err := s.beatService.GetUploadURL(ctx, filePath)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
 	}
 
-	return &audiov1.UploadResponse{BeatUploadUrl: url}, nil
+	imageURL, err := s.beatService.GetUploadURL(ctx, imagePath)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
+	}
+
+	return &audiov1.UploadResponse{FileUploadUrl: fileURL, ImageUploadUrl: imageURL}, nil
 }
 
-func (s *server) GetBeatMeta(ctx context.Context, req *audiov1.GetBeatMetaRequest) (*audiov1.GetBeatMetaResponse, error) {
+func (s *server) GetBeat(ctx context.Context, req *audiov1.GetBeatRequest) (*audiov1.GetBeatResponse, error) {
 	v := validator.New()
-	model.ValidateGetBeatMeta(v, req)
+	model.ValidateGetBeat(v, req)
 	if !v.Valid() {
 		logger.Log().Debug(ctx, "validation failed: %v", v.Errors)
 		return nil, toGRPCError(v)
@@ -77,5 +83,5 @@ func (s *server) GetBeatMeta(ctx context.Context, req *audiov1.GetBeatMetaReques
 		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
 	}
 
-	return model.ToGetBeatMetaResponse(beat, beatmaker, beatGenres), nil
+	return model.ToGetBeatResponse(beat, beatmaker, beatGenres), nil
 }

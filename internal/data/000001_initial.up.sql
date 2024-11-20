@@ -1,7 +1,8 @@
 create table if not exists "beats" (
     "id" integer primary key,
     "beatmaker_id" integer not null,
-    "path" varchar(64) not null,
+    "file_path" varchar(64) not null,
+    "image_path" varchar(64) not null,
     "name" varchar(128) not null,
     "description" text not null,
     "is_downloaded" boolean not null default false,
@@ -10,7 +11,7 @@ create table if not exists "beats" (
     "updated_at" timestamp not null default current_timestamp
 );
 
-create index on "beats" ("path");
+create index on "beats" ("file_path");
 create index on "beats" ("beatmaker_id");
 
 create table if not exists "beats_genres" (

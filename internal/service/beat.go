@@ -28,7 +28,7 @@ func (s *service) GetBeatFromS3(ctx context.Context, beatID, start int64, end *i
 		return nil, 0, "", err
 	}
 
-	obj, size, contentType, err = s.beatStore.GetBeatFromS3(ctx, beat.Path, start, end)
+	obj, size, contentType, err = s.beatStore.GetBeatFromS3(ctx, beat.FilePath, start, end)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, 0, "", err
@@ -83,24 +83,27 @@ func (s *service) WritePartialContent(ctx context.Context, r io.Reader, w io.Wri
 	return nil
 }
 
-func (s *service) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.BeatGenre) (beatPath string, err error) {
-	beatPath = uuid.New().String()
-	beat.Path = beatPath
+func (s *service) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.BeatGenre) (filePath, imagePath string, err error) {
+	filePath = uuid.New().String()
+	beat.FilePath = filePath
+
+	imagePath = uuid.New().String()
+	beat.ImagePath = imagePath
 
 	_, err = s.beatStore.AddBeat(ctx, beat, beatGenre)
 	if err != nil {
 		if errors.Is(err, core.ErrBeatExists) {
 			beat, err := s.beatStore.GetBeatByID(ctx, int64(beat.ID), core.Any)
 			if err != nil {
-				return "", err
+				return "", "", err
 			}
 
-			return beat.Path, nil
+			return beat.FilePath, beat.ImagePath, nil
 		}
-		return "", err
+		return "", "", err
 	}
 
-	return beatPath, err
+	return filePath, imagePath, nil
 }
 
 func (s *service) GetUploadURL(ctx context.Context, beatPath string) (string, error) {
