@@ -35,7 +35,7 @@ func New(
 	return &store{m, pg, bucketName, rdb, userHistory}
 }
 
-func (s *store) GetBeatByID(ctx context.Context, beatID int64, param core.IsDownloaded) (*core.Beat, error) {
+func (s *store) GetBeatByID(ctx context.Context, beatID int, param core.IsDownloaded) (*core.Beat, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
@@ -74,23 +74,25 @@ func (s *store) GetBeatByID(ctx context.Context, beatID int64, param core.IsDown
 	return &beat, nil
 }
 
-func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int64, end *int64) (obj io.ReadCloser, size int64, contentType string, err error) {
+func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int, end *int) (obj io.ReadCloser, size int, contentType string, err error) {
 	objInfo, err := s.Minio.Client.StatObject(ctx, s.bucketName, beatPath, miniolib.StatObjectOptions{})
 	if err != nil {
 		return nil, 0, "", err
 	}
 
-	if start >= objInfo.Size || start < 0 {
+	size = int(objInfo.Size)
+
+	if start >= size || start < 0 {
 		return nil, 0, "", core.ErrInvalidRange
 	}
 
-	if *end >= objInfo.Size || start > 0 && *end == -1 {
-		*end = objInfo.Size - 1
+	if *end >= size || start > 0 && *end == -1 {
+		*end = size - 1
 	}
 
 	opts := miniolib.GetObjectOptions{}
 	if start != 0 || *end != -1 {
-		if err := opts.SetRange(start, *end); err != nil {
+		if err := opts.SetRange(int64(start), int64(*end)); err != nil {
 			return nil, 0, "", err
 		}
 	}
@@ -100,7 +102,7 @@ func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int64,
 		return nil, 0, "", err
 	}
 
-	return obj, objInfo.Size, objInfo.ContentType, nil
+	return obj, size, objInfo.ContentType, nil
 }
 
 func (s *store) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.BeatGenre) (beatID int, err error) {

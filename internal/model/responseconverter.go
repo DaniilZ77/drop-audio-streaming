@@ -120,3 +120,10 @@ func ToBeat(beat *core.Beat, beatmaker Beatmaker, genre, image string) Beat {
 		CreatedAt:   beat.CreatedAt,
 	}
 }
+
+func ToUploadResponse(fileURL, imageURL string) *audiov1.UploadResponse {
+	return &audiov1.UploadResponse{
+		FileUploadUrl:  fileURL,
+		ImageUploadUrl: imageURL,
+	}
+}

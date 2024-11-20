@@ -8,8 +8,8 @@ import (
 
 type (
 	BeatStorage interface {
-		GetBeatFromS3(ctx context.Context, beatPath string, start int64, end *int64) (obj io.ReadCloser, size int64, contentType string, err error)
-		GetBeatByID(ctx context.Context, id int64, param IsDownloaded) (*Beat, error)
+		GetBeatFromS3(ctx context.Context, beatPath string, start int, end *int) (obj io.ReadCloser, size int, contentType string, err error)
+		GetBeatByID(ctx context.Context, id int, param IsDownloaded) (*Beat, error)
 		AddBeat(ctx context.Context, beat Beat, beatGenre []BeatGenre) (beatID int, err error)
 		GetPresignedURL(ctx context.Context, beatPath string, expiry time.Duration) (url string, err error)
 		GetBeatByFilter(ctx context.Context, filter FeedFilter, seen []string) (beat *Beat, genre *string, err error)
@@ -23,7 +23,7 @@ type (
 	}
 
 	BeatService interface {
-		GetBeatFromS3(ctx context.Context, beatID int64, start int64, end *int64) (obj io.ReadCloser, size int64, contentType string, err error)
+		GetBeatFromS3(ctx context.Context, beatID int, start int, end *int) (obj io.ReadCloser, size int, contentType string, err error)
 		AddBeat(ctx context.Context, beat Beat, beatGenre []BeatGenre) (beatPath, imagePath string, err error)
 		WritePartialContent(ctx context.Context, r io.Reader, w io.Writer, chunkSize int) error
 		GetUploadURL(ctx context.Context, beatPath string) (url string, err error)

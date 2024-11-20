@@ -7,22 +7,6 @@ import (
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
 )
 
-type (
-	GetBeatsParams struct {
-		Limit  int    `schema:"limit"`
-		Offset int    `schema:"offset"`
-		Order  string `schema:"order"`
-	}
-)
-
-func (p GetBeatsParams) ToCoreGetBeatsParams() core.GetBeatsParams {
-	return core.GetBeatsParams{
-		Limit:  p.Limit,
-		Offset: p.Offset,
-		Order:  p.Order,
-	}
-}
-
 func ToCoreBeat(req *audiov1.UploadRequest) core.Beat {
 	return core.Beat{
 		ID:          int(req.GetBeatId()),
@@ -46,5 +30,13 @@ func ToCoreBeatGenre(req *audiov1.UploadRequest) []core.BeatGenre {
 func ToCoreFeedFilter(params url.Values) core.FeedFilter {
 	return core.FeedFilter{
 		Genre: params.Get("genre"),
+	}
+}
+
+func ToGetBeatsParams(limit, offset int, order string) *core.GetBeatsParams {
+	return &core.GetBeatsParams{
+		Limit:  limit,
+		Offset: offset,
+		Order:  order,
 	}
 }

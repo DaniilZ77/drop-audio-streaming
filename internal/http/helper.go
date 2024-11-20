@@ -11,10 +11,7 @@ import (
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
 	"github.com/golang-jwt/jwt"
-	"github.com/gorilla/schema"
 )
-
-var decoder = schema.NewDecoder()
 
 func validToken(ctx context.Context, tokenString, secret string) (*int, error) {
 	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
@@ -53,7 +50,7 @@ func getUserIDFromContext(ctx context.Context) (int, error) {
 	return id, nil
 }
 
-func parseRangeHeader(ctx context.Context, req *http.Request) (start, end int64, err error) {
+func parseRangeHeader(ctx context.Context, req *http.Request) (start, end int, err error) {
 	val := strings.TrimPrefix(req.Header.Get("Range"), "bytes=")
 	if val == "" {
 		return 0, -1, nil
@@ -65,7 +62,7 @@ func parseRangeHeader(ctx context.Context, req *http.Request) (start, end int64,
 		return 0, 0, core.ErrInvalidRange
 	}
 
-	start, err = strconv.ParseInt(tmp[0], 10, 64)
+	start, err = strconv.Atoi(tmp[0])
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return 0, 0, core.ErrInvalidRange
@@ -74,7 +71,7 @@ func parseRangeHeader(ctx context.Context, req *http.Request) (start, end int64,
 	if tmp[1] == "" {
 		return start, -1, nil
 	}
-	end, err = strconv.ParseInt(tmp[1], 10, 64)
+	end, err = strconv.Atoi(tmp[1])
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return 0, 0, core.ErrInvalidRange

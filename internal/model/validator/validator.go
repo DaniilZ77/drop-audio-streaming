@@ -2,6 +2,7 @@ package validator
 
 import (
 	"regexp"
+	"strconv"
 )
 
 var (
@@ -51,4 +52,13 @@ func OneOf(value string, other ...string) bool {
 		}
 	}
 	return false
+}
+
+func IsInteger(value string) bool {
+	_, err := strconv.Atoi(value)
+	if err != nil {
+		return false
+	}
+
+	return true
 }

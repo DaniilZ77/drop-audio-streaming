@@ -30,7 +30,7 @@ func (s *server) Upload(ctx context.Context, req *audiov1.UploadRequest) (*audio
 	model.ValidateUploadRequest(v, req)
 	if !v.Valid() {
 		logger.Log().Debug(ctx, "validation failed: %v", v.Errors)
-		return nil, toGRPCError(v)
+		return nil, withDetails(codes.InvalidArgument, core.ErrValidationFailed, v.Errors)
 	}
 
 	beat := model.ToCoreBeat(req)
@@ -57,7 +57,7 @@ func (s *server) Upload(ctx context.Context, req *audiov1.UploadRequest) (*audio
 		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
 	}
 
-	return &audiov1.UploadResponse{FileUploadUrl: fileURL, ImageUploadUrl: imageURL}, nil
+	return model.ToUploadResponse(fileURL, imageURL), nil
 }
 
 func (s *server) GetBeat(ctx context.Context, req *audiov1.GetBeatRequest) (*audiov1.GetBeatResponse, error) {
@@ -65,7 +65,7 @@ func (s *server) GetBeat(ctx context.Context, req *audiov1.GetBeatRequest) (*aud
 	model.ValidateGetBeat(v, req)
 	if !v.Valid() {
 		logger.Log().Debug(ctx, "validation failed: %v", v.Errors)
-		return nil, toGRPCError(v)
+		return nil, withDetails(codes.InvalidArgument, core.ErrValidationFailed, v.Errors)
 	}
 
 	beat, beatGenres, err := s.beatService.GetBeat(ctx, int(req.GetBeatId()))

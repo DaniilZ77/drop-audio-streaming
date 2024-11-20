@@ -1,17 +1,15 @@
 package grpc
 
 import (
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model/validator"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func toGRPCError(v *validator.Validator) error {
-	st := status.New(codes.InvalidArgument, core.ErrValidationFailed.Error())
+func withDetails(code codes.Code, err error, details map[string]string) error {
+	st := status.New(code, err.Error())
 	var violations []*errdetails.QuotaFailure_Violation
-	for k, v := range v.Errors {
+	for k, v := range details {
 		violations = append(violations, &errdetails.QuotaFailure_Violation{
 			Subject:     k,
 			Description: v,

@@ -1,6 +1,9 @@
 package model
 
 import (
+	"net/url"
+	"strconv"
+
 	audiov1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model/validator"
 )
@@ -17,9 +20,44 @@ func ValidateGetBeat(v *validator.Validator, req *audiov1.GetBeatRequest) {
 	v.Check(validator.AtLeast(int(req.GetBeatId()), 1), "beat_id", "must be positive")
 }
 
-func ValidateGetBeatmakerBeats(v *validator.Validator, getBeatsParams GetBeatsParams, beatmakerID int) {
-	v.Check(validator.Between(getBeatsParams.Limit, 1, 100), "limit", "must be positive and less than or equal 100")
-	v.Check(validator.AtLeast(getBeatsParams.Offset, 0), "offset", "must be non-negative")
-	v.Check(validator.OneOf(getBeatsParams.Order, "asc", "desc"), "order", "must be one of acs or desc")
-	v.Check(validator.AtLeast(beatmakerID, 1), "beatmaker_id", "must be positive")
+func ValidateGetBeatmakerBeats(
+	v *validator.Validator,
+	values url.Values,
+	idStr string,
+	limit, offset, id *int) {
+	limitStr := values.Get("limit")
+	offsetStr := values.Get("offset")
+	order := values.Get("order")
+
+	if !validator.IsInteger(limitStr) {
+		v.Check(false, "limit", "must be integer")
+	} else {
+		*limit, _ = strconv.Atoi(limitStr)
+		v.Check(validator.Between(*limit, 1, 100), "limit", "must be positive and less than or equal 100")
+	}
+
+	if !validator.IsInteger(offsetStr) {
+		v.Check(false, "offset", "must be integer")
+	} else {
+		*offset, _ = strconv.Atoi(offsetStr)
+		v.Check(validator.AtLeast(*offset, 0), "offset", "must be non negative")
+	}
+
+	if !validator.IsInteger(idStr) {
+		v.Check(false, "beatmaker_id", "must be integer")
+	} else {
+		*id, _ = strconv.Atoi(idStr)
+		v.Check(validator.AtLeast(*id, 1), "beatmaker_id", "must be positive")
+	}
+
+	v.Check(validator.OneOf(order, "asc", "desc"), "order", "must be one of acs or desc")
+}
+
+func ValidateStream(v *validator.Validator, idStr string, id *int) {
+	if !validator.IsInteger(idStr) {
+		v.Check(false, "id", "must be integer")
+	} else {
+		*id, _ = strconv.Atoi(idStr)
+		v.Check(validator.AtLeast(*id, 1), "id", "must be positive")
+	}
 }

@@ -21,7 +21,7 @@ func New(beatStore core.BeatStorage, uploadURLTTL int) core.BeatService {
 	return &service{beatStore: beatStore, uploadURLTTL: uploadURLTTL}
 }
 
-func (s *service) GetBeatFromS3(ctx context.Context, beatID, start int64, end *int64) (obj io.ReadCloser, size int64, contentType string, err error) {
+func (s *service) GetBeatFromS3(ctx context.Context, beatID, start int, end *int) (obj io.ReadCloser, size int, contentType string, err error) {
 	beat, err := s.beatStore.GetBeatByID(ctx, beatID, core.True)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
@@ -93,7 +93,7 @@ func (s *service) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.
 	_, err = s.beatStore.AddBeat(ctx, beat, beatGenre)
 	if err != nil {
 		if errors.Is(err, core.ErrBeatExists) {
-			beat, err := s.beatStore.GetBeatByID(ctx, int64(beat.ID), core.Any)
+			beat, err := s.beatStore.GetBeatByID(ctx, beat.ID, core.Any)
 			if err != nil {
 				return "", "", err
 			}
@@ -149,7 +149,7 @@ func (s *service) GetBeatByFilter(ctx context.Context, userID int, filter core.F
 }
 
 func (s *service) GetBeat(ctx context.Context, beatID int) (beat *core.Beat, beatGenres []core.BeatGenre, err error) {
-	beat, err = s.beatStore.GetBeatByID(ctx, int64(beatID), core.True)
+	beat, err = s.beatStore.GetBeatByID(ctx, beatID, core.True)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, nil, err
