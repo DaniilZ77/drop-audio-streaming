@@ -29,7 +29,7 @@ func ValidateGetBeatmakerBeats(
 	params *core.GetBeatsParams) {
 	limitStr := values.Get("limit")
 	offsetStr := values.Get("offset")
-	order := values.Get("order")
+	params.Order = values.Get("order")
 
 	if !validator.IsInteger(limitStr) {
 		v.Check(false, "limit", "must be integer")
