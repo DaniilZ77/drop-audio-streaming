@@ -1,0 +1,114 @@
+services:
+  backend:
+    container_name: drop-audio-streaming
+    restart: always
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "50052:50052"
+      - "8081:8081"
+    networks:
+      - drop-audio-streaming
+      - drop-shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "./bin/migrator -db_url postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} -migrations_path ${MIGRATIONS_PATH} &&
+      ./bin/drop-audio-streaming -db_url postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} -grpc_port ${GRPC_PORT} -grpc_user_client_addr ${GRPC_USER_CLIENT_ADDR} -http_port ${HTTP_PORT} -redis_password ${REDIS_PASSWORD} -redis_addr ${REDIS_ADDRESS} -cert ${CERT} -key ${KEY} -jwt_secret ${JWT_SECRET} -read_timeout ${READ_TIMEOUT} -log_level ${LOG_LEVEL} -minio_password ${MINIO_PASSWORD} -minio_user ${MINIO_USER} -minio_endpoint ${MINIO_ENDPOINT} -minio_bucket ${MINIO_BUCKET} -minio_use_ssl ${MINIO_USE_SSL} -minio_location ${MINIO_LOCATION} -chunk_size ${CHUNK_SIZE} -upload_url_ttl ${UPLOAD_URL_TTL} -user_history ${USER_HISTORY} -grpc_client_retries ${GRPC_CLIENT_RETRIES} -grpc_client_timeout ${GRPC_CLIENT_TIMEOUT}"
+
+  postgres:
+    image: postgres:16.4-alpine
+    container_name: postgres-streaming
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "5430:5432"
+    environment:
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+      POSTGRES_USER: $POSTGRES_USER
+      POSTGRES_DB: $POSTGRES_DB
+    networks:
+      - drop-audio-streaming
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+  
+  redis:
+    image: redis:alpine
+    container_name: redis-streaming
+    restart: always
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    networks:
+      - drop-audio-streaming
+    volumes:
+      - redis-data:/var/lib/redis/data
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    command: /bin/sh -c "redis-server --requirepass ${REDIS_PASSWORD}"
+  
+  minio:
+    image: minio/minio
+    container_name: minio-streaming
+    restart: always
+    networks:
+      - drop-audio-streaming
+    ports:
+      - "8090:8090"
+    volumes:
+      - minio-data:/var/lib/minio/data
+    env_file:
+      - .env
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+      MINIO_NOTIFY_POSTGRES_ENABLE_PRIMARY: on
+      MINIO_NOTIFY_POSTGRES_FORMAT_PRIMARY: access
+      MINIO_NOTIFY_POSTGRES_TABLE_PRIMARY: ${MINIO_EVENTS_TABLE}
+      MINIO_NOTIFY_POSTGRES_CONNECTION_STRING_PRIMARY: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+    command: server --console-address ":8090" /var/lib/minio/data
+  
+  mc:
+    image: minio/mc
+    container_name: mc-streaming
+    depends_on:
+      - minio
+    env_file:
+      - .env
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc config host add myminio http://${MINIO_ENDPOINT} ${MINIO_USER} ${MINIO_PASSWORD}) do echo '...waiting...' && sleep 1; done;
+      /usr/bin/mc mb --ignore-existing myminio/${MINIO_BUCKET};
+      /usr/bin/mc event remove --event put myminio/${MINIO_BUCKET} arn:minio:sqs::PRIMARY:postgresql;
+      /usr/bin/mc event add --event put myminio/${MINIO_BUCKET} arn:minio:sqs::PRIMARY:postgresql;
+      exit 0;
+      "
+    networks:
+      - drop-audio-streaming
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+
+networks:
+  drop-audio-streaming:
+    driver: bridge
+  drop-shared:
+    external: true
