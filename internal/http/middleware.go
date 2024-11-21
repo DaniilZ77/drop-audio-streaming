@@ -20,7 +20,7 @@ func (r *Router) ensureValidToken(next runtime.HandlerFunc) runtime.HandlerFunc 
 		id, err := validToken(ctx, tokenString, r.jwtSecret)
 		if err != nil {
 			logger.Log().Debug(ctx, err.Error())
-			http.Error(w, core.ErrUnauthorized.Error(), http.StatusUnauthorized)
+			errorResponse(ctx, w, http.StatusUnauthorized, core.ErrUnauthorized, nil)
 			return
 		}
 
