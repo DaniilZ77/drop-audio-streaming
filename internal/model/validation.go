@@ -29,7 +29,7 @@ func ValidateGetBeatmakerBeats(
 	params *core.GetBeatsParams) {
 	limitStr := values.Get("limit")
 	offsetStr := values.Get("offset")
-	order := values.Get("order")
+	params.Order = values.Get("order")
 
 	if !validator.IsInteger(limitStr) {
 		v.Check(false, "limit", "must be integer")
@@ -52,7 +52,7 @@ func ValidateGetBeatmakerBeats(
 		v.Check(validator.AtLeast(*id, 1), "beatmaker_id", "must be positive")
 	}
 
-	v.Check(validator.OneOf(order, "asc", "desc"), "order", "must be one of acs or desc")
+	v.Check(validator.OneOf(params.Order, "asc", "desc"), "order", "must be one of acs or desc")
 }
 
 func ValidateStream(v *validator.Validator, idStr string, id *int) {
