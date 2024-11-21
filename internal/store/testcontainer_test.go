@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -86,6 +85,5 @@ func TestMain(m *testing.M) {
 		}
 	}()
 
-	exitCode := m.Run()
-	os.Exit(exitCode)
+	m.Run()
 }

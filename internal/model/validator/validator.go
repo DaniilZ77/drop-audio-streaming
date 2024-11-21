@@ -56,9 +56,5 @@ func OneOf(value string, other ...string) bool {
 
 func IsInteger(value string) bool {
 	_, err := strconv.Atoi(value)
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }

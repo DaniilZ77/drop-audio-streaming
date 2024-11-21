@@ -249,7 +249,7 @@ func (_c *MockBeatStorage_GetBeatByFilter_Call) RunAndReturn(run func(context.Co
 }
 
 // GetBeatByID provides a mock function with given fields: ctx, id, param
-func (_m *MockBeatStorage) GetBeatByID(ctx context.Context, id int64, param core.IsDownloaded) (*core.Beat, error) {
+func (_m *MockBeatStorage) GetBeatByID(ctx context.Context, id int, param core.IsDownloaded) (*core.Beat, error) {
 	ret := _m.Called(ctx, id, param)
 
 	if len(ret) == 0 {
@@ -258,10 +258,10 @@ func (_m *MockBeatStorage) GetBeatByID(ctx context.Context, id int64, param core
 
 	var r0 *core.Beat
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, core.IsDownloaded) (*core.Beat, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, int, core.IsDownloaded) (*core.Beat, error)); ok {
 		return rf(ctx, id, param)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64, core.IsDownloaded) *core.Beat); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, int, core.IsDownloaded) *core.Beat); ok {
 		r0 = rf(ctx, id, param)
 	} else {
 		if ret.Get(0) != nil {
@@ -269,7 +269,7 @@ func (_m *MockBeatStorage) GetBeatByID(ctx context.Context, id int64, param core
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64, core.IsDownloaded) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, int, core.IsDownloaded) error); ok {
 		r1 = rf(ctx, id, param)
 	} else {
 		r1 = ret.Error(1)
@@ -285,15 +285,15 @@ type MockBeatStorage_GetBeatByID_Call struct {
 
 // GetBeatByID is a helper method to define mock.On call
 //   - ctx context.Context
-//   - id int64
+//   - id int
 //   - param core.IsDownloaded
 func (_e *MockBeatStorage_Expecter) GetBeatByID(ctx interface{}, id interface{}, param interface{}) *MockBeatStorage_GetBeatByID_Call {
 	return &MockBeatStorage_GetBeatByID_Call{Call: _e.mock.On("GetBeatByID", ctx, id, param)}
 }
 
-func (_c *MockBeatStorage_GetBeatByID_Call) Run(run func(ctx context.Context, id int64, param core.IsDownloaded)) *MockBeatStorage_GetBeatByID_Call {
+func (_c *MockBeatStorage_GetBeatByID_Call) Run(run func(ctx context.Context, id int, param core.IsDownloaded)) *MockBeatStorage_GetBeatByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(core.IsDownloaded))
+		run(args[0].(context.Context), args[1].(int), args[2].(core.IsDownloaded))
 	})
 	return _c
 }
@@ -303,13 +303,13 @@ func (_c *MockBeatStorage_GetBeatByID_Call) Return(_a0 *core.Beat, _a1 error) *M
 	return _c
 }
 
-func (_c *MockBeatStorage_GetBeatByID_Call) RunAndReturn(run func(context.Context, int64, core.IsDownloaded) (*core.Beat, error)) *MockBeatStorage_GetBeatByID_Call {
+func (_c *MockBeatStorage_GetBeatByID_Call) RunAndReturn(run func(context.Context, int, core.IsDownloaded) (*core.Beat, error)) *MockBeatStorage_GetBeatByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetBeatFromS3 provides a mock function with given fields: ctx, beatPath, start, end
-func (_m *MockBeatStorage) GetBeatFromS3(ctx context.Context, beatPath string, start int64, end *int64) (io.ReadCloser, int64, string, error) {
+func (_m *MockBeatStorage) GetBeatFromS3(ctx context.Context, beatPath string, start int, end *int) (io.ReadCloser, int, string, error) {
 	ret := _m.Called(ctx, beatPath, start, end)
 
 	if len(ret) == 0 {
@@ -317,13 +317,13 @@ func (_m *MockBeatStorage) GetBeatFromS3(ctx context.Context, beatPath string, s
 	}
 
 	var r0 io.ReadCloser
-	var r1 int64
+	var r1 int
 	var r2 string
 	var r3 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int64, *int64) (io.ReadCloser, int64, string, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, *int) (io.ReadCloser, int, string, error)); ok {
 		return rf(ctx, beatPath, start, end)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int64, *int64) io.ReadCloser); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, *int) io.ReadCloser); ok {
 		r0 = rf(ctx, beatPath, start, end)
 	} else {
 		if ret.Get(0) != nil {
@@ -331,19 +331,19 @@ func (_m *MockBeatStorage) GetBeatFromS3(ctx context.Context, beatPath string, s
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, int64, *int64) int64); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, *int) int); ok {
 		r1 = rf(ctx, beatPath, start, end)
 	} else {
-		r1 = ret.Get(1).(int64)
+		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, int64, *int64) string); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, string, int, *int) string); ok {
 		r2 = rf(ctx, beatPath, start, end)
 	} else {
 		r2 = ret.Get(2).(string)
 	}
 
-	if rf, ok := ret.Get(3).(func(context.Context, string, int64, *int64) error); ok {
+	if rf, ok := ret.Get(3).(func(context.Context, string, int, *int) error); ok {
 		r3 = rf(ctx, beatPath, start, end)
 	} else {
 		r3 = ret.Error(3)
@@ -360,25 +360,25 @@ type MockBeatStorage_GetBeatFromS3_Call struct {
 // GetBeatFromS3 is a helper method to define mock.On call
 //   - ctx context.Context
 //   - beatPath string
-//   - start int64
-//   - end *int64
+//   - start int
+//   - end *int
 func (_e *MockBeatStorage_Expecter) GetBeatFromS3(ctx interface{}, beatPath interface{}, start interface{}, end interface{}) *MockBeatStorage_GetBeatFromS3_Call {
 	return &MockBeatStorage_GetBeatFromS3_Call{Call: _e.mock.On("GetBeatFromS3", ctx, beatPath, start, end)}
 }
 
-func (_c *MockBeatStorage_GetBeatFromS3_Call) Run(run func(ctx context.Context, beatPath string, start int64, end *int64)) *MockBeatStorage_GetBeatFromS3_Call {
+func (_c *MockBeatStorage_GetBeatFromS3_Call) Run(run func(ctx context.Context, beatPath string, start int, end *int)) *MockBeatStorage_GetBeatFromS3_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int64), args[3].(*int64))
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(*int))
 	})
 	return _c
 }
 
-func (_c *MockBeatStorage_GetBeatFromS3_Call) Return(obj io.ReadCloser, size int64, contentType string, err error) *MockBeatStorage_GetBeatFromS3_Call {
+func (_c *MockBeatStorage_GetBeatFromS3_Call) Return(obj io.ReadCloser, size int, contentType string, err error) *MockBeatStorage_GetBeatFromS3_Call {
 	_c.Call.Return(obj, size, contentType, err)
 	return _c
 }
 
-func (_c *MockBeatStorage_GetBeatFromS3_Call) RunAndReturn(run func(context.Context, string, int64, *int64) (io.ReadCloser, int64, string, error)) *MockBeatStorage_GetBeatFromS3_Call {
+func (_c *MockBeatStorage_GetBeatFromS3_Call) RunAndReturn(run func(context.Context, string, int, *int) (io.ReadCloser, int, string, error)) *MockBeatStorage_GetBeatFromS3_Call {
 	_c.Call.Return(run)
 	return _c
 }

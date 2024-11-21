@@ -25,7 +25,7 @@ func (_m *MockBeatService) EXPECT() *MockBeatService_Expecter {
 }
 
 // AddBeat provides a mock function with given fields: ctx, beat, beatGenre
-func (_m *MockBeatService) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.BeatGenre) (string, error) {
+func (_m *MockBeatService) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.BeatGenre) (string, string, error) {
 	ret := _m.Called(ctx, beat, beatGenre)
 
 	if len(ret) == 0 {
@@ -33,8 +33,9 @@ func (_m *MockBeatService) AddBeat(ctx context.Context, beat core.Beat, beatGenr
 	}
 
 	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, core.Beat, []core.BeatGenre) (string, error)); ok {
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, core.Beat, []core.BeatGenre) (string, string, error)); ok {
 		return rf(ctx, beat, beatGenre)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, core.Beat, []core.BeatGenre) string); ok {
@@ -43,13 +44,19 @@ func (_m *MockBeatService) AddBeat(ctx context.Context, beat core.Beat, beatGenr
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, core.Beat, []core.BeatGenre) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, core.Beat, []core.BeatGenre) string); ok {
 		r1 = rf(ctx, beat, beatGenre)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(string)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, core.Beat, []core.BeatGenre) error); ok {
+		r2 = rf(ctx, beat, beatGenre)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // MockBeatService_AddBeat_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddBeat'
@@ -72,12 +79,12 @@ func (_c *MockBeatService_AddBeat_Call) Run(run func(ctx context.Context, beat c
 	return _c
 }
 
-func (_c *MockBeatService_AddBeat_Call) Return(beatPath string, err error) *MockBeatService_AddBeat_Call {
-	_c.Call.Return(beatPath, err)
+func (_c *MockBeatService_AddBeat_Call) Return(beatPath string, imagePath string, err error) *MockBeatService_AddBeat_Call {
+	_c.Call.Return(beatPath, imagePath, err)
 	return _c
 }
 
-func (_c *MockBeatService_AddBeat_Call) RunAndReturn(run func(context.Context, core.Beat, []core.BeatGenre) (string, error)) *MockBeatService_AddBeat_Call {
+func (_c *MockBeatService_AddBeat_Call) RunAndReturn(run func(context.Context, core.Beat, []core.BeatGenre) (string, string, error)) *MockBeatService_AddBeat_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -220,7 +227,7 @@ func (_c *MockBeatService_GetBeatByFilter_Call) RunAndReturn(run func(context.Co
 }
 
 // GetBeatFromS3 provides a mock function with given fields: ctx, beatID, start, end
-func (_m *MockBeatService) GetBeatFromS3(ctx context.Context, beatID int64, start int64, end *int64) (io.ReadCloser, int64, string, error) {
+func (_m *MockBeatService) GetBeatFromS3(ctx context.Context, beatID int, start int, end *int) (io.ReadCloser, int, string, error) {
 	ret := _m.Called(ctx, beatID, start, end)
 
 	if len(ret) == 0 {
@@ -228,13 +235,13 @@ func (_m *MockBeatService) GetBeatFromS3(ctx context.Context, beatID int64, star
 	}
 
 	var r0 io.ReadCloser
-	var r1 int64
+	var r1 int
 	var r2 string
 	var r3 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int64, *int64) (io.ReadCloser, int64, string, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, *int) (io.ReadCloser, int, string, error)); ok {
 		return rf(ctx, beatID, start, end)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int64, *int64) io.ReadCloser); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, *int) io.ReadCloser); ok {
 		r0 = rf(ctx, beatID, start, end)
 	} else {
 		if ret.Get(0) != nil {
@@ -242,19 +249,19 @@ func (_m *MockBeatService) GetBeatFromS3(ctx context.Context, beatID int64, star
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64, int64, *int64) int64); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, *int) int); ok {
 		r1 = rf(ctx, beatID, start, end)
 	} else {
-		r1 = ret.Get(1).(int64)
+		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, int64, int64, *int64) string); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, int, int, *int) string); ok {
 		r2 = rf(ctx, beatID, start, end)
 	} else {
 		r2 = ret.Get(2).(string)
 	}
 
-	if rf, ok := ret.Get(3).(func(context.Context, int64, int64, *int64) error); ok {
+	if rf, ok := ret.Get(3).(func(context.Context, int, int, *int) error); ok {
 		r3 = rf(ctx, beatID, start, end)
 	} else {
 		r3 = ret.Error(3)
@@ -270,26 +277,26 @@ type MockBeatService_GetBeatFromS3_Call struct {
 
 // GetBeatFromS3 is a helper method to define mock.On call
 //   - ctx context.Context
-//   - beatID int64
-//   - start int64
-//   - end *int64
+//   - beatID int
+//   - start int
+//   - end *int
 func (_e *MockBeatService_Expecter) GetBeatFromS3(ctx interface{}, beatID interface{}, start interface{}, end interface{}) *MockBeatService_GetBeatFromS3_Call {
 	return &MockBeatService_GetBeatFromS3_Call{Call: _e.mock.On("GetBeatFromS3", ctx, beatID, start, end)}
 }
 
-func (_c *MockBeatService_GetBeatFromS3_Call) Run(run func(ctx context.Context, beatID int64, start int64, end *int64)) *MockBeatService_GetBeatFromS3_Call {
+func (_c *MockBeatService_GetBeatFromS3_Call) Run(run func(ctx context.Context, beatID int, start int, end *int)) *MockBeatService_GetBeatFromS3_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(int64), args[3].(*int64))
+		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(*int))
 	})
 	return _c
 }
 
-func (_c *MockBeatService_GetBeatFromS3_Call) Return(obj io.ReadCloser, size int64, contentType string, err error) *MockBeatService_GetBeatFromS3_Call {
+func (_c *MockBeatService_GetBeatFromS3_Call) Return(obj io.ReadCloser, size int, contentType string, err error) *MockBeatService_GetBeatFromS3_Call {
 	_c.Call.Return(obj, size, contentType, err)
 	return _c
 }
 
-func (_c *MockBeatService_GetBeatFromS3_Call) RunAndReturn(run func(context.Context, int64, int64, *int64) (io.ReadCloser, int64, string, error)) *MockBeatService_GetBeatFromS3_Call {
+func (_c *MockBeatService_GetBeatFromS3_Call) RunAndReturn(run func(context.Context, int, int, *int) (io.ReadCloser, int, string, error)) *MockBeatService_GetBeatFromS3_Call {
 	_c.Call.Return(run)
 	return _c
 }

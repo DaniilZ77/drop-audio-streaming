@@ -22,10 +22,10 @@ func TestGetBeatByID(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, 101, beat.BeatmakerID)
-		assert.Equal(t, "/path/to/beat1", beat.Path)
+		assert.Equal(t, "/path/to/beat1", beat.FilePath)
 		assert.Equal(t, "hip-hop vibes", beat.Name)
 		assert.Equal(t, "a smooth hip-hop beat with relaxing vibes.", beat.Description)
-		assert.Equal(t, false, beat.IsDownloaded)
+		assert.Equal(t, false, beat.IsFileDownloaded)
 		assert.Equal(t, false, beat.IsDeleted)
 	})
 
@@ -47,7 +47,7 @@ func TestAddBeat(t *testing.T) {
 	beat := core.Beat{
 		ID:          4,
 		BeatmakerID: 1,
-		Path:        "/path/to/beat4",
+		FilePath:    "/path/to/beat4",
 		Name:        "synthwave journey",
 		Description: "a retro synthwave beat with 80s vibes.",
 	}
@@ -68,17 +68,17 @@ func TestAddBeat(t *testing.T) {
 
 	var gotBeat core.Beat
 	err = tdb.DB.
-		QueryRow("select id, beatmaker_id, path, name, description from beats where id = $1", beatID).
+		QueryRow("select id, beatmaker_id, file_path, name, description from beats where id = $1", beatID).
 		Scan(
 			&gotBeat.ID,
 			&gotBeat.BeatmakerID,
-			&gotBeat.Path,
+			&gotBeat.FilePath,
 			&gotBeat.Name,
 			&gotBeat.Description)
 	require.NoError(t, err)
 	assert.Equal(t, beat.ID, gotBeat.ID)
 	assert.Equal(t, beat.BeatmakerID, gotBeat.BeatmakerID)
-	assert.Equal(t, beat.Path, gotBeat.Path)
+	assert.Equal(t, beat.FilePath, gotBeat.FilePath)
 	assert.Equal(t, beat.Name, gotBeat.Name)
 	assert.Equal(t, beat.Description, gotBeat.Description)
 
@@ -99,6 +99,8 @@ func TestAddBeat(t *testing.T) {
 
 		cnt++
 	}
+
+	require.NoError(t, rows.Err())
 }
 
 func TestGetBeatByFilter(t *testing.T) {

@@ -42,12 +42,8 @@ func (s *service) GetBeatFromS3(ctx context.Context, beatID, start int, end *int
 func (s *service) WritePartialContent(ctx context.Context, r io.Reader, w io.Writer, chunkSize int) error {
 	data := make(chan []byte)
 	var wg sync.WaitGroup
-	wg.Add(1)
+	wg.Add(2)
 	logger.Log().Debug(ctx, "beat stream started")
-
-	defer logger.Log().Debug(ctx, "beat stream ended")
-	defer close(data)
-	defer wg.Wait()
 
 	go func() {
 		defer wg.Done()
@@ -56,29 +52,31 @@ func (s *service) WritePartialContent(ctx context.Context, r io.Reader, w io.Wri
 			n, err := r.Read(buf)
 			if err != nil && err != io.EOF {
 				logger.Log().Error(ctx, err.Error())
-				return
+				break
 			}
 
 			if n == 0 {
-				return
+				break
 			}
 
 			data <- buf[:n]
 		}
+
+		close(data)
 	}()
 
 	go func() {
-		for {
-			chunk, ok := <-data
-			if !ok && chunk == nil {
-				return
-			}
-
+		defer wg.Done()
+		for chunk := range data {
 			if _, err := w.Write(chunk); err != nil {
+				logger.Log().Error(ctx, err.Error())
 				return
 			}
 		}
 	}()
+
+	wg.Wait()
+	logger.Log().Debug(ctx, "beat stream ended")
 
 	return nil
 }

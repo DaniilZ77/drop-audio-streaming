@@ -122,18 +122,16 @@ func (r *Router) getBeatmakerBeats(w http.ResponseWriter, req *http.Request, par
 	ctx := req.Context()
 
 	v := validator.New()
-	var limit, offset, id int
-	model.ValidateGetBeatmakerBeats(v, req.URL.Query(), params["id"], &limit, &offset, &id)
+	var getBeatsParams core.GetBeatsParams
+	var id int
+	model.ValidateGetBeatmakerBeats(v, req.URL.Query(), params["id"], &id, &getBeatsParams)
 	if !v.Valid() {
 		logger.Log().Debug(ctx, "%+v", v.Errors)
 		errorResponse(ctx, w, http.StatusBadRequest, core.ErrValidationFailed, []interface{}{model.ToValidationErrors(v)})
 		return
 	}
 
-	order := req.URL.Query().Get("order")
-	getBeatsParams := model.ToGetBeatsParams(limit, offset, order)
-
-	beats, beatsGenres, total, err := r.beatService.GetBeatsByBeatmakerID(ctx, int(id), *getBeatsParams)
+	beats, beatsGenres, total, err := r.beatService.GetBeatsByBeatmakerID(ctx, id, getBeatsParams)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
@@ -143,7 +141,7 @@ func (r *Router) getBeatmakerBeats(w http.ResponseWriter, req *http.Request, par
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	b, err := toJSON(model.ToGetBeatmakerBeatsResponse(beats, beatsGenres, *getBeatsParams, total))
+	b, err := toJSON(model.ToGetBeatmakerBeatsResponse(beats, beatsGenres, getBeatsParams, total))
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		errorResponse(ctx, w, http.StatusServiceUnavailable, core.ErrUnavailable, nil)

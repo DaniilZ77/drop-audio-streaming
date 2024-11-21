@@ -28,10 +28,10 @@ func TestGetBeatFromS3_Success(t *testing.T) {
 	beat := &core.Beat{
 		FilePath: "path/to/beat1",
 	}
-	var start, end int64 = 0, 100
+	start, end := 0, 100
 
 	beatStorage.EXPECT().
-		GetBeatByID(mock.Anything, int64(1), core.True).
+		GetBeatByID(mock.Anything, 1, core.True).
 		Return(beat, nil).
 		Once()
 	beatStorage.EXPECT().
@@ -41,7 +41,7 @@ func TestGetBeatFromS3_Success(t *testing.T) {
 
 	obj, size, contentType, err := beatService.GetBeatFromS3(ctx, 1, start, &end)
 	require.NoError(t, err)
-	assert.Equal(t, int64(200), size)
+	assert.Equal(t, 200, size)
 	assert.Equal(t, "application/json", contentType)
 
 	body, err := io.ReadAll(obj)
@@ -68,7 +68,7 @@ func TestGetBeatFromS3_Fail(t *testing.T) {
 			name: "beat not found",
 			behaviour: func() {
 				beatStorage.EXPECT().
-					GetBeatByID(mock.Anything, int64(1), core.True).
+					GetBeatByID(mock.Anything, 1, core.True).
 					Return(nil, core.ErrBeatNotFound).
 					Once()
 			},
@@ -78,7 +78,7 @@ func TestGetBeatFromS3_Fail(t *testing.T) {
 			name: "s3 error",
 			behaviour: func() {
 				beatStorage.EXPECT().
-					GetBeatByID(mock.Anything, int64(1), core.True).
+					GetBeatByID(mock.Anything, 1, core.True).
 					Return(&core.Beat{}, nil).
 					Once()
 				beatStorage.EXPECT().
@@ -137,13 +137,13 @@ func TestAddBeat(t *testing.T) {
 
 	beatStorage.EXPECT().
 		AddBeat(mock.Anything, mock.MatchedBy(func(beat core.Beat) bool {
-			path = beat.Path
+			path = beat.FilePath
 			return beat.ID == 1 && beat.Name == "beat1"
 		}), beatGenre).
 		Return(1, nil).
 		Once()
 
-	beatPath, err := beatService.AddBeat(ctx, beat, beatGenre)
+	beatPath, _, err := beatService.AddBeat(ctx, beat, beatGenre)
 	require.NoError(t, err)
 	assert.Equal(t, path, beatPath)
 }
@@ -170,13 +170,13 @@ func TestAddBeat_BeatExists(t *testing.T) {
 		Return(0, core.ErrBeatExists).
 		Once()
 	beatStorage.EXPECT().
-		GetBeatByID(mock.Anything, int64(1), core.Any).
+		GetBeatByID(mock.Anything, 1, core.Any).
 		Return(&core.Beat{
-			Path: "path/to/beat1",
+			FilePath: "path/to/beat1",
 		}, nil).
 		Once()
 
-	beatPath, err := beatService.AddBeat(ctx, beat, beatGenre)
+	beatPath, _, err := beatService.AddBeat(ctx, beat, beatGenre)
 	require.NoError(t, err)
 	assert.Equal(t, "path/to/beat1", beatPath)
 }
@@ -203,7 +203,7 @@ func TestAddBeat_Fail(t *testing.T) {
 		Return(0, errors.New("db error")).
 		Once()
 
-	_, err := beatService.AddBeat(ctx, beat, beatGenre)
+	_, _, err := beatService.AddBeat(ctx, beat, beatGenre)
 	assert.Error(t, err)
 }
 
