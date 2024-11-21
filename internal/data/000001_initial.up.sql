@@ -5,13 +5,15 @@ create table if not exists "beats" (
     "image_path" varchar(64) not null,
     "name" varchar(128) not null,
     "description" text not null,
-    "is_downloaded" boolean not null default false,
+    "is_file_downloaded" boolean not null default false,
+    "is_image_downloaded" boolean not null default false,
     "is_deleted" boolean not null default false,
     "created_at" timestamp not null default current_timestamp,
     "updated_at" timestamp not null default current_timestamp
 );
 
 create index on "beats" ("file_path");
+create index on "beats" ("image_path");
 create index on "beats" ("beatmaker_id");
 
 create table if not exists "beats_genres" (
@@ -36,9 +38,15 @@ declare
 begin
     s3_path := NEW.event_data->'Records'->0->'s3'->'object'->>'key';
 
-    update "beats"
-    set "is_downloaded" = true
-    where "path" = s3_path;
+    if exists(select 1 from "beats" where "file_path" = s3_path) then
+        update "beats"
+        set "is_file_downloaded" = true
+        where "file_path" = s3_path;
+    else
+        update "beats"
+        set "is_image_downloaded" = true
+        where "image_path" = s3_path;
+    end if;
 
     return new;
 end;

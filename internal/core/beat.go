@@ -43,16 +43,17 @@ type (
 	}
 
 	Beat struct {
-		ID           int
-		BeatmakerID  int
-		FilePath     string
-		ImagePath    string
-		Name         string
-		Description  string
-		IsDownloaded bool
-		IsDeleted    bool
-		CreatedAt    time.Time
-		UpdatedAt    time.Time
+		ID                int
+		BeatmakerID       int
+		FilePath          string
+		ImagePath         string
+		Name              string
+		Description       string
+		IsFileDownloaded  bool
+		IsImageDownloaded bool
+		IsDeleted         bool
+		CreatedAt         time.Time
+		UpdatedAt         time.Time
 	}
 
 	GetBeatsParams struct {

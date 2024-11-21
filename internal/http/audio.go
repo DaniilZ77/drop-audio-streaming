@@ -50,7 +50,7 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 	defer beat.Close()
 
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Connection", "keep-alive")
+	// w.Header().Set("Connection", "keep-alive")
 	if start != 0 || end != -1 {
 		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, size))
 		w.WriteHeader(http.StatusPartialContent)
