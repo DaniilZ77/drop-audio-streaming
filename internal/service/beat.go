@@ -49,26 +49,25 @@ func (s *service) WritePartialContent(ctx context.Context, r io.Reader, w io.Wri
 	go func() {
 		defer close(data)
 		defer wg.Done()
+
 		for {
 			buf := make([]byte, chunkSize)
 			n, err := r.Read(buf)
 			if err != nil && err != io.EOF {
 				logger.Log().Error(ctx, err.Error())
-				break
+				return
 			}
 
 			if n == 0 {
-				break
+				return
 			}
 
 			select {
 			case data <- buf[:n]:
 			case <-quit:
-				break
+				return
 			}
 		}
-
-		logger.Log().Debug(ctx, "stopped sending data")
 	}()
 
 	go func() {
@@ -77,7 +76,7 @@ func (s *service) WritePartialContent(ctx context.Context, r io.Reader, w io.Wri
 		for chunk := range data {
 			if _, err := w.Write(chunk); err != nil {
 				logger.Log().Error(ctx, err.Error())
-				break
+				return
 			}
 		}
 	}()

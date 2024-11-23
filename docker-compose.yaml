@@ -7,7 +7,7 @@ services:
       - .env
     ports:
       - "50052:50052"
-      - "8081:8081"
+      - "8083:8081"
     networks:
       - drop-audio-streaming
       - drop-shared
