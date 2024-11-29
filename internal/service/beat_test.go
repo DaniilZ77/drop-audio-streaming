@@ -231,11 +231,7 @@ func TestGetBeatByFilter(t *testing.T) {
 		}, &[]string{"genre1"}[0], nil).
 		Once()
 	beatStorage.EXPECT().
-		PopUserSeenBeat(mock.Anything, userID).
-		Return(nil).
-		Once()
-	beatStorage.EXPECT().
-		AddUserSeenBeat(mock.Anything, userID, 1).
+		ReplaceUserSeenBeat(mock.Anything, userID, 1).
 		Return(nil).
 		Once()
 
@@ -303,11 +299,7 @@ func TestGetBeatByFilter_NotFound(t *testing.T) {
 		}, &[]string{"genre1"}[0], nil).
 		Once()
 	beatStorage.EXPECT().
-		PopUserSeenBeat(mock.Anything, userID).
-		Return(nil).
-		Once()
-	beatStorage.EXPECT().
-		AddUserSeenBeat(mock.Anything, userID, 1).
+		ReplaceUserSeenBeat(mock.Anything, userID, 1).
 		Return(nil).
 		Once()
 

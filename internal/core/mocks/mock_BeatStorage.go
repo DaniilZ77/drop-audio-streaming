@@ -84,54 +84,6 @@ func (_c *MockBeatStorage_AddBeat_Call) RunAndReturn(run func(context.Context, c
 	return _c
 }
 
-// AddUserSeenBeat provides a mock function with given fields: ctx, userID, beatID
-func (_m *MockBeatStorage) AddUserSeenBeat(ctx context.Context, userID int, beatID int) error {
-	ret := _m.Called(ctx, userID, beatID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for AddUserSeenBeat")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, int) error); ok {
-		r0 = rf(ctx, userID, beatID)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockBeatStorage_AddUserSeenBeat_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddUserSeenBeat'
-type MockBeatStorage_AddUserSeenBeat_Call struct {
-	*mock.Call
-}
-
-// AddUserSeenBeat is a helper method to define mock.On call
-//   - ctx context.Context
-//   - userID int
-//   - beatID int
-func (_e *MockBeatStorage_Expecter) AddUserSeenBeat(ctx interface{}, userID interface{}, beatID interface{}) *MockBeatStorage_AddUserSeenBeat_Call {
-	return &MockBeatStorage_AddUserSeenBeat_Call{Call: _e.mock.On("AddUserSeenBeat", ctx, userID, beatID)}
-}
-
-func (_c *MockBeatStorage_AddUserSeenBeat_Call) Run(run func(ctx context.Context, userID int, beatID int)) *MockBeatStorage_AddUserSeenBeat_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int), args[2].(int))
-	})
-	return _c
-}
-
-func (_c *MockBeatStorage_AddUserSeenBeat_Call) Return(_a0 error) *MockBeatStorage_AddUserSeenBeat_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockBeatStorage_AddUserSeenBeat_Call) RunAndReturn(run func(context.Context, int, int) error) *MockBeatStorage_AddUserSeenBeat_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // ClearUserSeenBeats provides a mock function with given fields: ctx, userID
 func (_m *MockBeatStorage) ClearUserSeenBeats(ctx context.Context, userID int) error {
 	ret := _m.Called(ctx, userID)
@@ -626,17 +578,17 @@ func (_c *MockBeatStorage_GetUserSeenBeats_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// PopUserSeenBeat provides a mock function with given fields: ctx, userID
-func (_m *MockBeatStorage) PopUserSeenBeat(ctx context.Context, userID int) error {
-	ret := _m.Called(ctx, userID)
+// ReplaceUserSeenBeat provides a mock function with given fields: ctx, userID, beatID
+func (_m *MockBeatStorage) ReplaceUserSeenBeat(ctx context.Context, userID int, beatID int) error {
+	ret := _m.Called(ctx, userID, beatID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for PopUserSeenBeat")
+		panic("no return value specified for ReplaceUserSeenBeat")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int) error); ok {
-		r0 = rf(ctx, userID)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) error); ok {
+		r0 = rf(ctx, userID, beatID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -644,31 +596,32 @@ func (_m *MockBeatStorage) PopUserSeenBeat(ctx context.Context, userID int) erro
 	return r0
 }
 
-// MockBeatStorage_PopUserSeenBeat_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PopUserSeenBeat'
-type MockBeatStorage_PopUserSeenBeat_Call struct {
+// MockBeatStorage_ReplaceUserSeenBeat_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReplaceUserSeenBeat'
+type MockBeatStorage_ReplaceUserSeenBeat_Call struct {
 	*mock.Call
 }
 
-// PopUserSeenBeat is a helper method to define mock.On call
+// ReplaceUserSeenBeat is a helper method to define mock.On call
 //   - ctx context.Context
 //   - userID int
-func (_e *MockBeatStorage_Expecter) PopUserSeenBeat(ctx interface{}, userID interface{}) *MockBeatStorage_PopUserSeenBeat_Call {
-	return &MockBeatStorage_PopUserSeenBeat_Call{Call: _e.mock.On("PopUserSeenBeat", ctx, userID)}
+//   - beatID int
+func (_e *MockBeatStorage_Expecter) ReplaceUserSeenBeat(ctx interface{}, userID interface{}, beatID interface{}) *MockBeatStorage_ReplaceUserSeenBeat_Call {
+	return &MockBeatStorage_ReplaceUserSeenBeat_Call{Call: _e.mock.On("ReplaceUserSeenBeat", ctx, userID, beatID)}
 }
 
-func (_c *MockBeatStorage_PopUserSeenBeat_Call) Run(run func(ctx context.Context, userID int)) *MockBeatStorage_PopUserSeenBeat_Call {
+func (_c *MockBeatStorage_ReplaceUserSeenBeat_Call) Run(run func(ctx context.Context, userID int, beatID int)) *MockBeatStorage_ReplaceUserSeenBeat_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int))
+		run(args[0].(context.Context), args[1].(int), args[2].(int))
 	})
 	return _c
 }
 
-func (_c *MockBeatStorage_PopUserSeenBeat_Call) Return(_a0 error) *MockBeatStorage_PopUserSeenBeat_Call {
+func (_c *MockBeatStorage_ReplaceUserSeenBeat_Call) Return(_a0 error) *MockBeatStorage_ReplaceUserSeenBeat_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockBeatStorage_PopUserSeenBeat_Call) RunAndReturn(run func(context.Context, int) error) *MockBeatStorage_PopUserSeenBeat_Call {
+func (_c *MockBeatStorage_ReplaceUserSeenBeat_Call) RunAndReturn(run func(context.Context, int, int) error) *MockBeatStorage_ReplaceUserSeenBeat_Call {
 	_c.Call.Return(run)
 	return _c
 }

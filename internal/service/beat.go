@@ -41,31 +41,37 @@ func (s *service) GetBeatFromS3(ctx context.Context, beatID, start int, end *int
 
 func (s *service) WritePartialContent(ctx context.Context, r io.Reader, w io.Writer, chunkSize int) error {
 	data := make(chan []byte)
+	quit := make(chan struct{}, 1)
 	var wg sync.WaitGroup
 	wg.Add(2)
 	logger.Log().Debug(ctx, "beat stream started")
 
 	go func() {
+		defer close(data)
 		defer wg.Done()
+
 		for {
 			buf := make([]byte, chunkSize)
 			n, err := r.Read(buf)
 			if err != nil && err != io.EOF {
 				logger.Log().Error(ctx, err.Error())
-				break
+				return
 			}
 
 			if n == 0 {
-				break
+				return
 			}
 
-			data <- buf[:n]
+			select {
+			case data <- buf[:n]:
+			case <-quit:
+				return
+			}
 		}
-
-		close(data)
 	}()
 
 	go func() {
+		defer func() { quit <- struct{}{} }()
 		defer wg.Done()
 		for chunk := range data {
 			if _, err := w.Write(chunk); err != nil {
@@ -135,11 +141,7 @@ func (s *service) GetBeatByFilter(ctx context.Context, userID int, filter core.F
 		}
 	}
 
-	if err := s.beatStore.PopUserSeenBeat(ctx, userID); err != nil {
-		return nil, nil, err
-	}
-
-	if err := s.beatStore.AddUserSeenBeat(ctx, userID, beat.ID); err != nil {
+	if err := s.beatStore.ReplaceUserSeenBeat(ctx, userID, beat.ID); err != nil {
 		return nil, nil, err
 	}
 
