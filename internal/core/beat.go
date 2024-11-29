@@ -17,8 +17,7 @@ type (
 		GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p GetBeatsParams) (beats []Beat, total int, err error)
 
 		GetUserSeenBeats(ctx context.Context, userID int) ([]string, error)
-		AddUserSeenBeat(ctx context.Context, userID int, beatID int) error
-		PopUserSeenBeat(ctx context.Context, userID int) error
+		ReplaceUserSeenBeat(ctx context.Context, userID int, beatID int) error
 		ClearUserSeenBeats(ctx context.Context, userID int) error
 	}
 

@@ -141,11 +141,7 @@ func (s *service) GetBeatByFilter(ctx context.Context, userID int, filter core.F
 		}
 	}
 
-	if err := s.beatStore.PopUserSeenBeat(ctx, userID); err != nil {
-		return nil, nil, err
-	}
-
-	if err := s.beatStore.AddUserSeenBeat(ctx, userID, beat.ID); err != nil {
+	if err := s.beatStore.ReplaceUserSeenBeat(ctx, userID, beat.ID); err != nil {
 		return nil, nil, err
 	}
 

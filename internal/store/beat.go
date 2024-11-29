@@ -16,6 +16,11 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	miniolib "github.com/minio/minio-go/v7"
+	redislib "github.com/redis/go-redis/v9"
+)
+
+const (
+	redisRetries = 100
 )
 
 type store struct {
@@ -223,34 +228,37 @@ func (s *store) GetUserSeenBeats(ctx context.Context, userID int) ([]string, err
 	return res, nil
 }
 
-func (s *store) AddUserSeenBeat(ctx context.Context, userID, beatID int) error {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	_, err := s.Redis.Client.LPush(ctx, fmt.Sprintf("%d", userID), beatID).Result()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *store) PopUserSeenBeat(ctx context.Context, userID int) error {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
+func (s *store) ReplaceUserSeenBeat(ctx context.Context, userID, beatID int) error {
 	key := fmt.Sprintf("%d", userID)
 
-	if cnt, err := s.Redis.Client.LLen(ctx, key).Result(); err != nil || cnt <= int64(s.userHistory) {
-		return err
+	for range redisRetries {
+		err := s.Redis.Client.Watch(ctx, func(tx *redislib.Tx) error {
+			cnt, err := tx.LLen(ctx, key).Result()
+			if err != nil {
+				return err
+			}
+
+			_, err = tx.TxPipelined(ctx, func(pipe redislib.Pipeliner) error {
+				if cnt >= int64(s.userHistory) {
+					if _, err = pipe.RPop(ctx, key).Result(); err != nil {
+						return err
+					}
+				}
+
+				if _, err = pipe.LPush(ctx, key, beatID).Result(); err != nil {
+					return err
+				}
+
+				return nil
+			})
+			return err
+		}, key)
+		if !errors.Is(err, redislib.TxFailedErr) {
+			return err
+		}
 	}
 
-	_, err := s.Redis.Client.RPop(ctx, key).Result()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return core.ErrAmountOfRetriesExceeded
 }
 
 func (s *store) ClearUserSeenBeats(ctx context.Context, userID int) error {
