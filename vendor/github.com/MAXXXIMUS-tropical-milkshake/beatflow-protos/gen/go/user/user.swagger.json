@@ -178,12 +178,6 @@
         "isDeleted": {
           "type": "boolean"
         },
-        "isEmailVerified": {
-          "type": "boolean"
-        },
-        "isTelephoneVerified": {
-          "type": "boolean"
-        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
@@ -294,12 +288,6 @@
         },
         "pseudonym": {
           "type": "string"
-        },
-        "isTelephoneVerified": {
-          "type": "boolean"
-        },
-        "isEmailVerified": {
-          "type": "boolean"
         },
         "createdAt": {
           "type": "string",

@@ -74,8 +74,22 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 		return
 	}
 
-	feedFilter := model.ToCoreFeedFilter(req.URL.Query())
-	beat, genre, err := r.beatService.GetBeatByFilter(ctx, userID, feedFilter)
+	v := validator.New()
+	feedFilter, err := model.ToCoreFeedFilter(v, req.URL.Query())
+	if err != nil {
+		logger.Log().Debug(ctx, err.Error())
+		errorResponse(ctx, w, http.StatusBadRequest, core.ErrValidationFailed, []interface{}{model.ToValidationErrors(v)})
+		return
+	}
+
+	model.ValidateGetBeatFiltered(v, *feedFilter)
+	if !v.Valid() {
+		logger.Log().Debug(ctx, "%+v", v.Errors)
+		errorResponse(ctx, w, http.StatusBadRequest, core.ErrValidationFailed, []interface{}{model.ToValidationErrors(v)})
+		return
+	}
+
+	beat, err := r.beatService.GetBeatByFilter(ctx, userID, *feedFilter)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatNotFound) {
@@ -86,14 +100,14 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 		return
 	}
 
-	imageURL, err := r.beatService.GetUploadURL(ctx, beat.ImagePath)
+	imageURL, err := r.beatService.GetUploadURL(ctx, beat.Beat.ImagePath)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
 		return
 	}
 
-	beatmaker, err := r.userClient.GetUserByID(ctx, beat.BeatmakerID)
+	beatmaker, err := r.userClient.GetUserByID(ctx, beat.Beat.BeatmakerID)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
@@ -102,7 +116,7 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 
 	apiBeatmaker := model.ToBeatmaker(beatmaker)
 
-	b, err := toJSON(model.ToBeat(beat, apiBeatmaker, *genre, imageURL))
+	b, err := toJSON(model.ToBeat(beat, apiBeatmaker, imageURL))
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		errorResponse(ctx, w, http.StatusServiceUnavailable, core.ErrUnavailable, nil)
@@ -131,7 +145,7 @@ func (r *Router) getBeatmakerBeats(w http.ResponseWriter, req *http.Request, par
 		return
 	}
 
-	beats, beatsGenres, total, err := r.beatService.GetBeatsByBeatmakerID(ctx, id, getBeatsParams)
+	beats, total, err := r.beatService.GetBeatsByBeatmakerID(ctx, id, getBeatsParams)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
@@ -141,7 +155,7 @@ func (r *Router) getBeatmakerBeats(w http.ResponseWriter, req *http.Request, par
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	b, err := toJSON(model.ToGetBeatmakerBeatsResponse(beats, beatsGenres, getBeatsParams, total))
+	b, err := toJSON(model.ToGetBeatmakerBeatsResponse(beats, getBeatsParams, total))
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		errorResponse(ctx, w, http.StatusServiceUnavailable, core.ErrUnavailable, nil)

@@ -67,7 +67,7 @@ func New(
 
 func (app *App) MustRun(ctx context.Context) {
 	if err := app.Run(ctx); err != nil {
-		logger.Log().Fatal(ctx, "Failed to run http server: %w", err)
+		logger.Log().Fatal(ctx, "Failed to run http server: %v", err)
 	}
 }
 

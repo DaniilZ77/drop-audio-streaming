@@ -1,0 +1,167 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: backend-streaming
+  name: backend-streaming
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend-streaming
+  template:
+    metadata:
+      labels:
+        app: backend-streaming
+    spec:
+      containers:
+        - args:
+            - "sh"
+            - "-c"
+            - "./bin/migrator -db_url postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-streaming:5432/${POSTGRES_DB} -migrations_path ${MIGRATIONS_PATH} && ./bin/drop-audio-streaming -db_url postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-streaming:5432/${POSTGRES_DB} -grpc_port ${GRPC_PORT} -grpc_user_client_addr ${GRPC_USER_CLIENT_ADDR} -http_port ${HTTP_PORT} -redis_password ${REDIS_PASSWORD} -redis_addr ${REDIS_ADDRESS} -cert ${CERT} -key ${KEY} -jwt_secret ${JWT_SECRET} -read_timeout ${READ_TIMEOUT} -log_level ${LOG_LEVEL} -minio_password ${MINIO_PASSWORD} -minio_user ${MINIO_USER} -minio_endpoint ${MINIO_ENDPOINT} -minio_bucket ${MINIO_BUCKET} -minio_use_ssl ${MINIO_USE_SSL} -minio_location ${MINIO_LOCATION} -chunk_size ${CHUNK_SIZE} -upload_url_ttl ${UPLOAD_URL_TTL} -user_history ${USER_HISTORY} -grpc_client_retries ${GRPC_CLIENT_RETRIES} -grpc_client_timeout ${GRPC_CLIENT_TIMEOUT}"
+          env:
+            - name: CERT
+              valueFrom:
+                configMapKeyRef:
+                  key: CERT
+                  name: backend-streaming-env
+            - name: CHUNK_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  key: CHUNK_SIZE
+                  name: backend-streaming-env
+            - name: GRPC_CLIENT_RETRIES
+              valueFrom:
+                configMapKeyRef:
+                  key: GRPC_CLIENT_RETRIES
+                  name: backend-streaming-env
+            - name: GRPC_CLIENT_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  key: GRPC_CLIENT_TIMEOUT
+                  name: backend-streaming-env
+            - name: GRPC_PORT
+              valueFrom:
+                configMapKeyRef:
+                  key: GRPC_PORT
+                  name: backend-streaming-env
+            - name: GRPC_USER_CLIENT_ADDR
+              valueFrom:
+                configMapKeyRef:
+                  key: GRPC_USER_CLIENT_ADDR
+                  name: backend-streaming-env
+            - name: HTTP_PORT
+              valueFrom:
+                configMapKeyRef:
+                  key: HTTP_PORT
+                  name: backend-streaming-env
+            - name: JWT_SECRET
+              valueFrom:
+                configMapKeyRef:
+                  key: JWT_SECRET
+                  name: backend-streaming-env
+            - name: KEY
+              valueFrom:
+                configMapKeyRef:
+                  key: KEY
+                  name: backend-streaming-env
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  key: LOG_LEVEL
+                  name: backend-streaming-env
+            - name: MIGRATIONS_PATH
+              valueFrom:
+                configMapKeyRef:
+                  key: MIGRATIONS_PATH
+                  name: backend-streaming-env
+            - name: MINIO_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  key: MINIO_BUCKET
+                  name: backend-streaming-env
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  key: MINIO_ENDPOINT
+                  name: backend-streaming-env
+            - name: MINIO_EVENTS_TABLE
+              valueFrom:
+                configMapKeyRef:
+                  key: MINIO_EVENTS_TABLE
+                  name: backend-streaming-env
+            - name: MINIO_LOCATION
+              valueFrom:
+                configMapKeyRef:
+                  key: MINIO_LOCATION
+                  name: backend-streaming-env
+            - name: MINIO_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: MINIO_PASSWORD
+                  name: backend-streaming-env
+            - name: MINIO_USER
+              valueFrom:
+                configMapKeyRef:
+                  key: MINIO_USER
+                  name: backend-streaming-env
+            - name: MINIO_USE_SSL
+              valueFrom:
+                configMapKeyRef:
+                  key: MINIO_USE_SSL
+                  name: backend-streaming-env
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  key: POSTGRES_DB
+                  name: backend-streaming-env
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: POSTGRES_PASSWORD
+                  name: backend-streaming-env
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  key: POSTGRES_USER
+                  name: backend-streaming-env
+            - name: READ_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  key: READ_TIMEOUT
+                  name: backend-streaming-env
+            - name: REDIS_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  key: REDIS_ADDRESS
+                  name: backend-streaming-env
+            - name: REDIS_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: REDIS_PASSWORD
+                  name: backend-streaming-env
+            - name: UPLOAD_URL_TTL
+              valueFrom:
+                configMapKeyRef:
+                  key: UPLOAD_URL_TTL
+                  name: backend-streaming-env
+            - name: USER_HISTORY
+              valueFrom:
+                configMapKeyRef:
+                  key: USER_HISTORY
+                  name: backend-streaming-env
+          image: daniilz77/drop-audio-streaming:1.1
+          name: drop-audio-streaming
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+          ports:
+            - containerPort: 50052
+              protocol: TCP
+            - containerPort: 8081
+              protocol: TCP
+      restartPolicy: Always

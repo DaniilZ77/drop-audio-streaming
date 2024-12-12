@@ -216,7 +216,7 @@ func TestGetBeatByFilter(t *testing.T) {
 
 	userID := 2
 	filter := core.FeedFilter{
-		Genre: "genre1",
+		Genres: []string{"genre1"},
 	}
 
 	beatStorage.EXPECT().
@@ -251,7 +251,7 @@ func TestGetBeatByFilter_Fail(t *testing.T) {
 
 	userID := 2
 	filter := core.FeedFilter{
-		Genre: "genre1",
+		Genres: []string{"genre1"},
 	}
 
 	beatStorage.EXPECT().
@@ -276,7 +276,7 @@ func TestGetBeatByFilter_NotFound(t *testing.T) {
 
 	userID := 2
 	filter := core.FeedFilter{
-		Genre: "genre1",
+		Genres: []string{"genre1"},
 	}
 
 	beatStorage.EXPECT().

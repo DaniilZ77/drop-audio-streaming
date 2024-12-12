@@ -113,7 +113,7 @@ func TestGetBeatByFilter(t *testing.T) {
 	beatStorage := New(nil, tdb, "", nil, 0)
 
 	filter := core.FeedFilter{
-		Genre: "lo",
+		Genres: []string{"lo-fi"},
 	}
 
 	beat, genre, err := beatStorage.GetBeatByFilter(ctx, filter, nil)
@@ -133,7 +133,7 @@ func TestGetBeatByFilter_NotFound(t *testing.T) {
 	beatStorage := New(nil, tdb, "", nil, 0)
 
 	filter := core.FeedFilter{
-		Genre: "tr",
+		Genres: []string{"tr"},
 	}
 
 	_, _, err := beatStorage.GetBeatByFilter(ctx, filter, nil)
@@ -150,7 +150,7 @@ func TestGetBeatByFilter_NotFound_Seen(t *testing.T) {
 	beatStorage := New(nil, tdb, "", nil, 0)
 
 	filter := core.FeedFilter{
-		Genre: "lo",
+		Genres: []string{"lo"},
 	}
 
 	_, _, err := beatStorage.GetBeatByFilter(ctx, filter, []string{"2"})

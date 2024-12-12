@@ -87,17 +87,17 @@ func (s *service) WritePartialContent(ctx context.Context, r io.Reader, w io.Wri
 	return nil
 }
 
-func (s *service) AddBeat(ctx context.Context, beat core.Beat, beatGenre []core.BeatGenre) (filePath, imagePath string, err error) {
+func (s *service) AddBeat(ctx context.Context, beat core.BeatParams) (filePath, imagePath string, err error) {
 	filePath = uuid.New().String()
-	beat.FilePath = filePath
+	beat.Beat.FilePath = filePath
 
 	imagePath = uuid.New().String()
-	beat.ImagePath = imagePath
+	beat.Beat.ImagePath = imagePath
 
-	_, err = s.beatStore.AddBeat(ctx, beat, beatGenre)
+	_, err = s.beatStore.AddBeat(ctx, beat)
 	if err != nil {
 		if errors.Is(err, core.ErrBeatExists) {
-			beat, err := s.beatStore.GetBeatByID(ctx, beat.ID, core.Any)
+			beat, err := s.beatStore.GetBeatByID(ctx, beat.Beat.ID, core.Any)
 			if err != nil {
 				return "", "", err
 			}
@@ -119,66 +119,51 @@ func (s *service) GetUploadURL(ctx context.Context, beatPath string) (string, er
 	return path, nil
 }
 
-func (s *service) GetBeatByFilter(ctx context.Context, userID int, filter core.FeedFilter) (beat *core.Beat, genre *string, err error) {
+func (s *service) GetBeatByFilter(ctx context.Context, userID int, filter core.FeedFilter) (beat *core.BeatParams, err error) {
 	beats, err := s.beatStore.GetUserSeenBeats(ctx, userID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	beat, genre, err = s.beatStore.GetBeatByFilter(ctx, filter, beats)
+	beat, err = s.beatStore.GetBeatByFilter(ctx, filter, beats)
 	if err != nil {
 		if errors.Is(err, core.ErrBeatNotFound) {
 			if err := s.beatStore.ClearUserSeenBeats(ctx, userID); err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 
-			beat, genre, err = s.beatStore.GetBeatByFilter(ctx, filter, []string{})
+			beat, err = s.beatStore.GetBeatByFilter(ctx, filter, []string{})
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 		} else {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
-	if err := s.beatStore.ReplaceUserSeenBeat(ctx, userID, beat.ID); err != nil {
-		return nil, nil, err
+	if err := s.beatStore.ReplaceUserSeenBeat(ctx, userID, beat.Beat.ID); err != nil {
+		return nil, err
 	}
 
-	return beat, genre, nil
+	return beat, nil
 }
 
-func (s *service) GetBeat(ctx context.Context, beatID int) (beat *core.Beat, beatGenres []core.BeatGenre, err error) {
-	beat, err = s.beatStore.GetBeatByID(ctx, beatID, core.True)
+func (s *service) GetBeat(ctx context.Context, beatID int) (beat *core.BeatParams, err error) {
+	beat, err = s.beatStore.GetFullBeatByID(ctx, beatID, core.True)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		return nil, nil, err
+		return nil, err
 	}
 
-	beatGenres, err = s.beatStore.GetBeatGenres(ctx, beatID)
-	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		return nil, nil, err
-	}
-
-	return beat, beatGenres, nil
+	return beat, nil
 }
 
-func (s *service) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p core.GetBeatsParams) (beats []core.Beat, beatsGenres [][]core.BeatGenre, total int, err error) {
-	beats, total, err = s.beatStore.GetBeatsByBeatmakerID(ctx, beatmakerID, p)
+func (s *service) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p core.GetBeatsParams) (beatsParams []core.BeatParams, total int, err error) {
+	beats, total, err := s.beatStore.GetBeatsByBeatmakerID(ctx, beatmakerID, p)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		return nil, nil, 0, err
+		return nil, 0, err
 	}
 
-	for _, beat := range beats {
-		genres, err := s.beatStore.GetBeatGenres(ctx, beat.ID)
-		if err != nil {
-			logger.Log().Error(ctx, err.Error())
-			return nil, nil, 0, err
-		}
-		beatsGenres = append(beatsGenres, genres)
-	}
-
-	return beats, beatsGenres, total, nil
+	return beats, total, nil
 }

@@ -15,8 +15,16 @@ type (
 		Image       string    `json:"image"`
 		Name        string    `json:"name"`
 		Description string    `json:"description"`
-		Genre       string    `json:"genre"`
+		Genres      []int     `json:"genres"`
+		Tags        []int     `json:"tags"`
+		Moods       []int     `json:"moods"`
+		Note        Note      `json:"note"`
 		CreatedAt   time.Time `json:"created_at"`
+	}
+
+	Note struct {
+		NoteID int    `json:"note_id"`
+		Scale  string `json:"scale"`
 	}
 
 	Beatmaker struct {
@@ -29,7 +37,10 @@ type (
 		ID          int       `json:"id"`
 		Name        string    `json:"name"`
 		Description string    `json:"description"`
-		Genre       []string  `json:"genre"`
+		Genres      []int     `json:"genres"`
+		Tags        []int     `json:"tags"`
+		Moods       []int     `json:"moods"`
+		Note        Note      `json:"note"`
 		CreatedAt   time.Time `json:"created_at"`
 	}
 
@@ -54,7 +65,7 @@ func ToBeatmaker(beatmaker *userv1.GetUserResponse) Beatmaker {
 	}
 }
 
-func ToGetBeatmakerBeatsResponse(beats []core.Beat, genres [][]core.BeatGenre, p core.GetBeatsParams, total int) BeatsPagination {
+func ToGetBeatmakerBeatsResponse(beats []core.BeatParams, p core.GetBeatsParams, total int) BeatsPagination {
 	var (
 		page    = (p.Offset / p.Limit) + 1
 		perPage = p.Limit
@@ -63,17 +74,31 @@ func ToGetBeatmakerBeatsResponse(beats []core.Beat, genres [][]core.BeatGenre, p
 
 	var beatsPagination []BeatPagination
 	for i := 0; i < len(beats); i++ {
-		var beatGenres []string
-		for _, genre := range genres[i] {
-			beatGenres = append(beatGenres, genre.Genre)
+		var beatGenres []int
+		for _, genre := range beats[i].Genres {
+			beatGenres = append(beatGenres, genre.GenreID)
+		}
+		var beatTags []int
+		for _, tag := range beats[i].Tags {
+			beatTags = append(beatTags, tag.TagID)
+		}
+		var beatMoods []int
+		for _, mood := range beats[i].Moods {
+			beatMoods = append(beatMoods, mood.MoodID)
 		}
 
 		beatPagination := BeatPagination{
-			ID:          beats[i].ID,
-			Name:        beats[i].Name,
-			Description: beats[i].Description,
-			CreatedAt:   beats[i].CreatedAt,
-			Genre:       beatGenres,
+			ID:          beats[i].Beat.ID,
+			Name:        beats[i].Beat.Name,
+			Description: beats[i].Beat.Description,
+			CreatedAt:   beats[i].Beat.CreatedAt,
+			Genres:      beatGenres,
+			Tags:        beatTags,
+			Moods:       beatMoods,
+			Note: Note{
+				NoteID: beats[i].Note.NoteID,
+				Scale:  beats[i].Note.Scale,
+			},
 		}
 
 		beatsPagination = append(beatsPagination, beatPagination)
@@ -90,34 +115,68 @@ func ToGetBeatmakerBeatsResponse(beats []core.Beat, genres [][]core.BeatGenre, p
 	}
 }
 
-func ToGetBeatResponse(beat *core.Beat, beatmaker *userv1.GetUserResponse, beatGenres []core.BeatGenre) *audiov1.GetBeatResponse {
-	genres := make([]string, 0)
-	for _, genre := range beatGenres {
-		genres = append(genres, genre.Genre)
+func ToGetBeatResponse(beat *core.BeatParams, beatmaker *userv1.GetUserResponse) *audiov1.GetBeatResponse {
+	var genres []int64
+	for _, genre := range beat.Genres {
+		genres = append(genres, int64(genre.GenreID))
+	}
+	var tags []int64
+	for _, tag := range beat.Tags {
+		tags = append(tags, int64(tag.TagID))
+	}
+	var moods []int64
+	for _, mood := range beat.Moods {
+		moods = append(moods, int64(mood.MoodID))
 	}
 
 	return &audiov1.GetBeatResponse{
-		Id:          int64(beat.ID),
-		Name:        beat.Name,
-		Description: beat.Description,
+		Id:          int64(beat.Beat.ID),
+		Name:        beat.Beat.Name,
+		Description: beat.Beat.Description,
 		Beatmaker: &audiov1.Beatmaker{
 			Id:        beatmaker.GetUserId(),
 			Username:  beatmaker.GetUsername(),
 			Pseudonym: beatmaker.GetPseudonym(),
 		},
 		BeatGenre: genres,
+		BeatTag:   tags,
+		BeatMood:  moods,
+		Note: &audiov1.NoteUpload{
+			NoteId: int64(beat.Note.NoteID),
+			Scale:  beat.Note.Scale,
+		},
+		Bpm: int64(beat.Beat.Bpm),
 	}
 }
 
-func ToBeat(beat *core.Beat, beatmaker Beatmaker, genre, image string) Beat {
+func ToBeat(beat *core.BeatParams, beatmaker Beatmaker, image string) Beat {
+	var genresInt []int
+	var tagsInt []int
+	var moodsInt []int
+	for _, genre := range beat.Genres {
+		genresInt = append(genresInt, genre.GenreID)
+	}
+	for _, tag := range beat.Tags {
+		tagsInt = append(tagsInt, tag.TagID)
+	}
+	for _, mood := range beat.Moods {
+		moodsInt = append(moodsInt, mood.MoodID)
+	}
+
 	return Beat{
-		ID:          beat.ID,
+		ID:          beat.Beat.ID,
 		Beatmaker:   beatmaker,
-		Name:        beat.Name,
-		Description: beat.Description,
+		Name:        beat.Beat.Name,
+		Description: beat.Beat.Description,
 		Image:       image,
-		Genre:       genre,
-		CreatedAt:   beat.CreatedAt,
+		Genres:      genresInt,
+		Tags:        tagsInt,
+		Moods:       moodsInt,
+		Note: Note{
+			NoteID: beat.Note.NoteID,
+			Scale:  beat.Note.Scale,
+		},
+		CreatedAt: beat.Beat.CreatedAt,
 	}
 }
 

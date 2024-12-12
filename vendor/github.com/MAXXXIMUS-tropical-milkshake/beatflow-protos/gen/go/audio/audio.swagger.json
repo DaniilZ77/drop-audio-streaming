@@ -48,6 +48,94 @@
         ]
       }
     },
+    "/v1/audio/genres": {
+      "get": {
+        "operationId": "AudioService_GetGenres",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/audioGetGenresResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "AudioService"
+        ]
+      }
+    },
+    "/v1/audio/moods": {
+      "get": {
+        "operationId": "AudioService_GetMoods",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/audioGetMoodsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "AudioService"
+        ]
+      }
+    },
+    "/v1/audio/notes": {
+      "get": {
+        "operationId": "AudioService_GetNotes",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/audioGetNotesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "AudioService"
+        ]
+      }
+    },
+    "/v1/audio/tags": {
+      "get": {
+        "operationId": "AudioService_GetTags",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/audioGetTagsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "AudioService"
+        ]
+      }
+    },
     "/v1/audio/{beatId}": {
       "get": {
         "operationId": "AudioService_GetBeat",
@@ -96,6 +184,18 @@
         }
       }
     },
+    "audioGenre": {
+      "type": "object",
+      "properties": {
+        "genreId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "audioGetBeatResponse": {
       "type": "object",
       "properties": {
@@ -115,8 +215,126 @@
         "beatGenre": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "format": "int64"
           }
+        },
+        "beatTag": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        },
+        "beatMood": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        },
+        "note": {
+          "$ref": "#/definitions/audioNoteUpload"
+        },
+        "bpm": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "audioGetGenresResponse": {
+      "type": "object",
+      "properties": {
+        "genres": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/audioGenre"
+          }
+        }
+      }
+    },
+    "audioGetMoodsResponse": {
+      "type": "object",
+      "properties": {
+        "moods": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/audioMood"
+          }
+        }
+      }
+    },
+    "audioGetNotesResponse": {
+      "type": "object",
+      "properties": {
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/audioNote"
+          }
+        }
+      }
+    },
+    "audioGetTagsResponse": {
+      "type": "object",
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/audioTag"
+          }
+        }
+      }
+    },
+    "audioMood": {
+      "type": "object",
+      "properties": {
+        "moodId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "audioNote": {
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "audioNoteUpload": {
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "scale": {
+          "type": "string"
+        }
+      }
+    },
+    "audioTag": {
+      "type": "object",
+      "properties": {
+        "tagId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
         }
       }
     },
@@ -140,8 +358,30 @@
         "beatGenre": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "format": "int64"
           }
+        },
+        "beatTag": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        },
+        "beatMood": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        },
+        "note": {
+          "$ref": "#/definitions/audioNoteUpload"
+        },
+        "bpm": {
+          "type": "string",
+          "format": "int64"
         }
       }
     },
