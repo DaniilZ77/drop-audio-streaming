@@ -17,6 +17,10 @@ type service struct {
 	uploadURLTTL int
 }
 
+func (s *service) GetFilters(ctx context.Context) (*core.Filters, error) {
+	return s.beatStore.GetFilters(ctx)
+}
+
 func New(beatStore core.BeatStorage, uploadURLTTL int) core.BeatService {
 	return &service{beatStore: beatStore, uploadURLTTL: uploadURLTTL}
 }

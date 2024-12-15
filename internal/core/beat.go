@@ -19,6 +19,7 @@ type (
 		GetUserSeenBeats(ctx context.Context, userID int) ([]string, error)
 		ReplaceUserSeenBeat(ctx context.Context, userID int, beatID int) error
 		ClearUserSeenBeats(ctx context.Context, userID int) error
+		GetFilters(ctx context.Context) (*Filters, error)
 	}
 
 	BeatService interface {
@@ -29,6 +30,7 @@ type (
 		GetBeatByFilter(ctx context.Context, userID int, params FeedFilter) (beat *BeatParams, err error)
 		GetBeat(ctx context.Context, beatID int) (beat *BeatParams, err error)
 		GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p GetBeatsParams) (beats []BeatParams, total int, err error)
+		GetFilters(ctx context.Context) (*Filters, error)
 	}
 
 	FeedFilter struct {
@@ -80,6 +82,18 @@ type (
 	Note struct {
 		ID   int
 		Name string
+	}
+
+	Genre struct {
+		ID   int
+		Name string
+	}
+
+	Filters struct {
+		Moods  []Mood
+		Tags   []Tag
+		Genres []Genre
+		Note   []Note
 	}
 
 	Beat struct {

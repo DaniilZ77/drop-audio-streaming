@@ -48,80 +48,14 @@
         ]
       }
     },
-    "/v1/audio/genres": {
+    "/v1/audio/filters": {
       "get": {
-        "operationId": "AudioService_GetGenres",
+        "operationId": "AudioService_GetFilters",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/audioGetGenresResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "tags": [
-          "AudioService"
-        ]
-      }
-    },
-    "/v1/audio/moods": {
-      "get": {
-        "operationId": "AudioService_GetMoods",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/audioGetMoodsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "tags": [
-          "AudioService"
-        ]
-      }
-    },
-    "/v1/audio/notes": {
-      "get": {
-        "operationId": "AudioService_GetNotes",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/audioGetNotesResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "tags": [
-          "AudioService"
-        ]
-      }
-    },
-    "/v1/audio/tags": {
-      "get": {
-        "operationId": "AudioService_GetTags",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/audioGetTagsResponse"
+              "$ref": "#/definitions/audioGetFiltersResponse"
             }
           },
           "default": {
@@ -242,7 +176,7 @@
         }
       }
     },
-    "audioGetGenresResponse": {
+    "audioGetFiltersResponse": {
       "type": "object",
       "properties": {
         "genres": {
@@ -251,41 +185,26 @@
             "type": "object",
             "$ref": "#/definitions/audioGenre"
           }
-        }
-      }
-    },
-    "audioGetMoodsResponse": {
-      "type": "object",
-      "properties": {
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/audioTag"
+          }
+        },
         "moods": {
           "type": "array",
           "items": {
             "type": "object",
             "$ref": "#/definitions/audioMood"
           }
-        }
-      }
-    },
-    "audioGetNotesResponse": {
-      "type": "object",
-      "properties": {
+        },
         "notes": {
           "type": "array",
           "items": {
             "type": "object",
             "$ref": "#/definitions/audioNote"
-          }
-        }
-      }
-    },
-    "audioGetTagsResponse": {
-      "type": "object",
-      "properties": {
-        "tags": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/audioTag"
           }
         }
       }

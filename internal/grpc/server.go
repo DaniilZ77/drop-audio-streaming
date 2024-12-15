@@ -21,20 +21,14 @@ type server struct {
 	userClient  *userclient.Client
 }
 
-func (s *server) GetGenres(context.Context, *audiov1.GetGenresRequest) (*audiov1.GetGenresResponse, error) {
-	panic("unimplemented")
-}
+func (s *server) GetFilters(ctx context.Context, req *audiov1.GetFiltersRequest) (*audiov1.GetFiltersResponse, error) {
+	filters, err := s.beatService.GetFilters(ctx)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
+	}
 
-func (s *server) GetMoods(context.Context, *audiov1.GetMoodsRequest) (*audiov1.GetMoodsResponse, error) {
-	panic("unimplemented")
-}
-
-func (s *server) GetNotes(context.Context, *audiov1.GetNotesRequest) (*audiov1.GetNotesResponse, error) {
-	panic("unimplemented")
-}
-
-func (s *server) GetTags(context.Context, *audiov1.GetTagsRequest) (*audiov1.GetTagsResponse, error) {
-	panic("unimplemented")
+	return model.ToGetFiltersResponse(*filters), nil
 }
 
 func Register(gRPCServer *grpc.Server, beatService core.BeatService, userClient *userclient.Client) {

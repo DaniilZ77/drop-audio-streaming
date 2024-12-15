@@ -40,10 +40,10 @@ func New(
 	return &store{m, pg, bucketName, rdb, userHistory}
 }
 
-func getFullBeatByID(ctx context.Context, tx *sql.Tx, beatID int, beat core.Beat) (*core.BeatParams, error) {
+func getFullBeatByID(ctx context.Context, tx *sql.Tx, beat core.Beat) (*core.BeatParams, error) {
 	var tags []core.BeatTag
 	stmt := `SELECT tag_id FROM beats_tags WHERE beat_id = $1`
-	res, err := tx.QueryContext(ctx, stmt, beatID)
+	res, err := tx.QueryContext(ctx, stmt, beat.ID)
 	for res.Next() {
 		var tag core.BeatTag
 		err = res.Scan(&tag.TagID)
@@ -56,7 +56,7 @@ func getFullBeatByID(ctx context.Context, tx *sql.Tx, beatID int, beat core.Beat
 
 	var moods []core.BeatMood
 	stmt = `SELECT mood_id FROM beats_moods WHERE beat_id = $1`
-	res, err = tx.QueryContext(ctx, stmt, beatID)
+	res, err = tx.QueryContext(ctx, stmt, beat.ID)
 	for res.Next() {
 		var mood core.BeatMood
 		err = res.Scan(&mood.MoodID)
@@ -69,7 +69,7 @@ func getFullBeatByID(ctx context.Context, tx *sql.Tx, beatID int, beat core.Beat
 
 	var genres []core.BeatGenre
 	stmt = `SELECT genre_id FROM beats_genres WHERE beat_id = $1`
-	res, err = tx.QueryContext(ctx, stmt, beatID)
+	res, err = tx.QueryContext(ctx, stmt, beat.ID)
 	for res.Next() {
 		var genre core.BeatGenre
 		err = res.Scan(&genre.GenreID)
@@ -82,7 +82,7 @@ func getFullBeatByID(ctx context.Context, tx *sql.Tx, beatID int, beat core.Beat
 
 	var note core.BeatNote
 	stmt = `SELECT note_id, scale FROM beats_notes WHERE beat_id = $1`
-	err = tx.QueryRowContext(ctx, stmt, beatID).Scan(&note.NoteID, &note.Scale)
+	err = tx.QueryRowContext(ctx, stmt, beat.ID).Scan(&note.NoteID, &note.Scale)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (s *store) GetFullBeatByID(ctx context.Context, id int, param core.IsDownlo
 		return nil, err
 	}
 
-	beatParams, err := getFullBeatByID(ctx, tx, id, beat)
+	beatParams, err := getFullBeatByID(ctx, tx, beat)
 	if err != nil {
 		return nil, err
 	}
@@ -306,9 +306,8 @@ func (s *store) AddBeat(ctx context.Context, beat core.BeatParams) (beatID int, 
 		return 0, err
 	}
 
-	stmt = `INSERT INTO beats_notes (beat_id, note_id, scale)
-	VALUES ($1, $2, $3)`
-	_, err = tx.ExecContext(ctx, stmt, beat.Note.BeatID, beat.Note.NoteID, beat.Note.Scale)
+	_, err = tx.ExecContext(ctx, `INSERT INTO beats_notes (beat_id, note_id, scale)
+	VALUES ($1, $2, $3)`, beat.Note.BeatID, beat.Note.NoteID, beat.Note.Scale)
 	if err != nil {
 		return 0, err
 	}
@@ -357,7 +356,7 @@ func (s *store) GetBeatByFilter(ctx context.Context, filter core.FeedFilter, see
 		cur += 2
 	}
 	if filter.Bpm != nil {
-		clause += fmt.Sprintf("AND b.bpm BETWEEN ($%d-15) AND ($%d+15)\n", cur)
+		clause += fmt.Sprintf("AND b.bpm BETWEEN ($%d-15) AND ($%d+15)\n", cur, cur)
 		args = append(args, filter.Bpm)
 		cur++
 	}
@@ -420,7 +419,7 @@ func (s *store) GetBeatByFilter(ctx context.Context, filter core.FeedFilter, see
 		return nil, err
 	}
 
-	beatParams, err := getFullBeatByID(ctx, tx, beat.ID, beat)
+	beatParams, err := getFullBeatByID(ctx, tx, beat)
 	if err != nil {
 		return nil, err
 	}
@@ -548,7 +547,7 @@ func (s *store) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p co
 			return nil, 0, err
 		}
 
-		beatParams, err := getFullBeatByID(ctx, tx, beat.ID, beat)
+		beatParams, err := getFullBeatByID(ctx, tx, beat)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -561,4 +560,76 @@ func (s *store) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p co
 	}
 
 	return beats, total, nil
+}
+
+func (s *store) GetFilters(ctx context.Context) (*core.Filters, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	stmt := `SELECT id, name FROM genres`
+	rows, err := s.DB.QueryContext(ctx, stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	var genres []core.Genre
+	for rows.Next() {
+		var genre core.Genre
+		if err := rows.Scan(&genre.ID, &genre.Name); err != nil {
+			return nil, err
+		}
+		genres = append(genres, genre)
+	}
+
+	stmt = `SELECT id, name FROM tags`
+	rows, err = s.DB.QueryContext(ctx, stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	var tags []core.Tag
+	for rows.Next() {
+		var tag core.Tag
+		if err := rows.Scan(&tag.ID, &tag.Name); err != nil {
+			return nil, err
+		}
+		tags = append(tags, tag)
+	}
+
+	stmt = `SELECT id, name FROM moods`
+	rows, err = s.DB.QueryContext(ctx, stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	var moods []core.Mood
+	for rows.Next() {
+		var mood core.Mood
+		if err := rows.Scan(&mood.ID, &mood.Name); err != nil {
+			return nil, err
+		}
+		moods = append(moods, mood)
+	}
+
+	stmt = `SELECT id, name FROM notes`
+	rows, err = s.DB.QueryContext(ctx, stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	var notes []core.Note
+	for rows.Next() {
+		var note core.Note
+		if err := rows.Scan(&note.ID, &note.Name); err != nil {
+			return nil, err
+		}
+		notes = append(notes, note)
+	}
+
+	return &core.Filters{
+		Genres: genres,
+		Tags:   tags,
+		Moods:  moods,
+		Note:   notes,
+	}, nil
 }

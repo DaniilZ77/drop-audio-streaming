@@ -19,12 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AudioService_Upload_FullMethodName    = "/audio.AudioService/Upload"
-	AudioService_GetBeat_FullMethodName   = "/audio.AudioService/GetBeat"
-	AudioService_GetGenres_FullMethodName = "/audio.AudioService/GetGenres"
-	AudioService_GetTags_FullMethodName   = "/audio.AudioService/GetTags"
-	AudioService_GetMoods_FullMethodName  = "/audio.AudioService/GetMoods"
-	AudioService_GetNotes_FullMethodName  = "/audio.AudioService/GetNotes"
+	AudioService_Upload_FullMethodName     = "/audio.AudioService/Upload"
+	AudioService_GetBeat_FullMethodName    = "/audio.AudioService/GetBeat"
+	AudioService_GetFilters_FullMethodName = "/audio.AudioService/GetFilters"
 )
 
 // AudioServiceClient is the client API for AudioService service.
@@ -33,10 +30,7 @@ const (
 type AudioServiceClient interface {
 	Upload(ctx context.Context, in *UploadRequest, opts ...grpc.CallOption) (*UploadResponse, error)
 	GetBeat(ctx context.Context, in *GetBeatRequest, opts ...grpc.CallOption) (*GetBeatResponse, error)
-	GetGenres(ctx context.Context, in *GetGenresRequest, opts ...grpc.CallOption) (*GetGenresResponse, error)
-	GetTags(ctx context.Context, in *GetTagsRequest, opts ...grpc.CallOption) (*GetTagsResponse, error)
-	GetMoods(ctx context.Context, in *GetMoodsRequest, opts ...grpc.CallOption) (*GetMoodsResponse, error)
-	GetNotes(ctx context.Context, in *GetNotesRequest, opts ...grpc.CallOption) (*GetNotesResponse, error)
+	GetFilters(ctx context.Context, in *GetFiltersRequest, opts ...grpc.CallOption) (*GetFiltersResponse, error)
 }
 
 type audioServiceClient struct {
@@ -67,40 +61,10 @@ func (c *audioServiceClient) GetBeat(ctx context.Context, in *GetBeatRequest, op
 	return out, nil
 }
 
-func (c *audioServiceClient) GetGenres(ctx context.Context, in *GetGenresRequest, opts ...grpc.CallOption) (*GetGenresResponse, error) {
+func (c *audioServiceClient) GetFilters(ctx context.Context, in *GetFiltersRequest, opts ...grpc.CallOption) (*GetFiltersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetGenresResponse)
-	err := c.cc.Invoke(ctx, AudioService_GetGenres_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *audioServiceClient) GetTags(ctx context.Context, in *GetTagsRequest, opts ...grpc.CallOption) (*GetTagsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetTagsResponse)
-	err := c.cc.Invoke(ctx, AudioService_GetTags_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *audioServiceClient) GetMoods(ctx context.Context, in *GetMoodsRequest, opts ...grpc.CallOption) (*GetMoodsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetMoodsResponse)
-	err := c.cc.Invoke(ctx, AudioService_GetMoods_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *audioServiceClient) GetNotes(ctx context.Context, in *GetNotesRequest, opts ...grpc.CallOption) (*GetNotesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetNotesResponse)
-	err := c.cc.Invoke(ctx, AudioService_GetNotes_FullMethodName, in, out, cOpts...)
+	out := new(GetFiltersResponse)
+	err := c.cc.Invoke(ctx, AudioService_GetFilters_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -113,10 +77,7 @@ func (c *audioServiceClient) GetNotes(ctx context.Context, in *GetNotesRequest, 
 type AudioServiceServer interface {
 	Upload(context.Context, *UploadRequest) (*UploadResponse, error)
 	GetBeat(context.Context, *GetBeatRequest) (*GetBeatResponse, error)
-	GetGenres(context.Context, *GetGenresRequest) (*GetGenresResponse, error)
-	GetTags(context.Context, *GetTagsRequest) (*GetTagsResponse, error)
-	GetMoods(context.Context, *GetMoodsRequest) (*GetMoodsResponse, error)
-	GetNotes(context.Context, *GetNotesRequest) (*GetNotesResponse, error)
+	GetFilters(context.Context, *GetFiltersRequest) (*GetFiltersResponse, error)
 	mustEmbedUnimplementedAudioServiceServer()
 }
 
@@ -133,17 +94,8 @@ func (UnimplementedAudioServiceServer) Upload(context.Context, *UploadRequest) (
 func (UnimplementedAudioServiceServer) GetBeat(context.Context, *GetBeatRequest) (*GetBeatResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBeat not implemented")
 }
-func (UnimplementedAudioServiceServer) GetGenres(context.Context, *GetGenresRequest) (*GetGenresResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetGenres not implemented")
-}
-func (UnimplementedAudioServiceServer) GetTags(context.Context, *GetTagsRequest) (*GetTagsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetTags not implemented")
-}
-func (UnimplementedAudioServiceServer) GetMoods(context.Context, *GetMoodsRequest) (*GetMoodsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetMoods not implemented")
-}
-func (UnimplementedAudioServiceServer) GetNotes(context.Context, *GetNotesRequest) (*GetNotesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetNotes not implemented")
+func (UnimplementedAudioServiceServer) GetFilters(context.Context, *GetFiltersRequest) (*GetFiltersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFilters not implemented")
 }
 func (UnimplementedAudioServiceServer) mustEmbedUnimplementedAudioServiceServer() {}
 func (UnimplementedAudioServiceServer) testEmbeddedByValue()                      {}
@@ -202,74 +154,20 @@ func _AudioService_GetBeat_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AudioService_GetGenres_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetGenresRequest)
+func _AudioService_GetFilters_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFiltersRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AudioServiceServer).GetGenres(ctx, in)
+		return srv.(AudioServiceServer).GetFilters(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AudioService_GetGenres_FullMethodName,
+		FullMethod: AudioService_GetFilters_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AudioServiceServer).GetGenres(ctx, req.(*GetGenresRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AudioService_GetTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetTagsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AudioServiceServer).GetTags(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AudioService_GetTags_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AudioServiceServer).GetTags(ctx, req.(*GetTagsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AudioService_GetMoods_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetMoodsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AudioServiceServer).GetMoods(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AudioService_GetMoods_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AudioServiceServer).GetMoods(ctx, req.(*GetMoodsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AudioService_GetNotes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetNotesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AudioServiceServer).GetNotes(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AudioService_GetNotes_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AudioServiceServer).GetNotes(ctx, req.(*GetNotesRequest))
+		return srv.(AudioServiceServer).GetFilters(ctx, req.(*GetFiltersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -290,20 +188,8 @@ var AudioService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AudioService_GetBeat_Handler,
 		},
 		{
-			MethodName: "GetGenres",
-			Handler:    _AudioService_GetGenres_Handler,
-		},
-		{
-			MethodName: "GetTags",
-			Handler:    _AudioService_GetTags_Handler,
-		},
-		{
-			MethodName: "GetMoods",
-			Handler:    _AudioService_GetMoods_Handler,
-		},
-		{
-			MethodName: "GetNotes",
-			Handler:    _AudioService_GetNotes_Handler,
+			MethodName: "GetFilters",
+			Handler:    _AudioService_GetFilters_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -55,17 +55,6 @@ func ToCoreBeat(req *audiov1.UploadRequest) core.BeatParams {
 	}
 }
 
-func ToCoreBeatGenre(req *audiov1.UploadRequest) []core.BeatGenre {
-	var beatGenre []core.BeatGenre
-	for _, genre := range req.GetBeatGenre() {
-		beatGenre = append(beatGenre, core.BeatGenre{
-			BeatID:  int(req.GetBeatId()),
-			GenreID: int(genre),
-		})
-	}
-	return beatGenre
-}
-
 func toIntSlice(str []string) ([]int, error) {
 	var intSlice []int
 	for _, s := range str {
@@ -117,7 +106,7 @@ func ToCoreFeedFilter(v *validator.Validator, params url.Values) (*core.FeedFilt
 	if len(noteStr) == 2 {
 		noteID, err := strconv.Atoi(noteStr[0])
 		if err != nil {
-			v.AddError("note", "must be in form note_id,scale")
+			v.AddError("note_id", "note_id must be integer")
 			return nil, core.ErrValidationFailed
 		}
 
