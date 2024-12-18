@@ -19,6 +19,7 @@ spec:
             - "sh"
             - "-c"
             - "./bin/migrator -db_url postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-streaming:5432/${POSTGRES_DB} -migrations_path ${MIGRATIONS_PATH} && ./bin/drop-audio-streaming -db_url postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-streaming:5432/${POSTGRES_DB} -grpc_port ${GRPC_PORT} -grpc_user_client_addr ${GRPC_USER_CLIENT_ADDR} -http_port ${HTTP_PORT} -redis_password ${REDIS_PASSWORD} -redis_addr ${REDIS_ADDRESS} -cert ${CERT} -key ${KEY} -jwt_secret ${JWT_SECRET} -read_timeout ${READ_TIMEOUT} -log_level ${LOG_LEVEL} -minio_password ${MINIO_PASSWORD} -minio_user ${MINIO_USER} -minio_endpoint ${MINIO_ENDPOINT} -minio_bucket ${MINIO_BUCKET} -minio_use_ssl ${MINIO_USE_SSL} -minio_location ${MINIO_LOCATION} -chunk_size ${CHUNK_SIZE} -upload_url_ttl ${UPLOAD_URL_TTL} -user_history ${USER_HISTORY} -grpc_client_retries ${GRPC_CLIENT_RETRIES} -grpc_client_timeout ${GRPC_CLIENT_TIMEOUT}"
+          imagePullPolicy: Always
           env:
             - name: CERT
               valueFrom:

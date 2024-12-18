@@ -73,8 +73,8 @@ func (app *App) MustRun(ctx context.Context) {
 
 func (app *App) Run(ctx context.Context) error {
 	logger.Log().Info(ctx, "http server started on %s", app.httpServer.Addr)
-	// return app.httpServer.ListenAndServeTLS(app.cert, app.key) nolint
-	return app.httpServer.ListenAndServe()
+	return app.httpServer.ListenAndServeTLS(app.cert, app.key)
+	// return app.httpServer.ListenAndServe()
 }
 
 func (app *App) Stop(ctx context.Context) {

@@ -2,6 +2,7 @@ package model
 
 import (
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -11,6 +12,15 @@ import (
 )
 
 func ToCoreBeat(req *audiov1.UploadRequest) core.BeatParams {
+	slices.Sort(req.BeatGenre)
+	req.BeatGenre = slices.Compact(req.BeatGenre)
+
+	slices.Sort(req.BeatTag)
+	req.BeatTag = slices.Compact(req.BeatTag)
+
+	slices.Sort(req.BeatMood)
+	req.BeatMood = slices.Compact(req.BeatMood)
+
 	var genres []core.BeatGenre
 	var tags []core.BeatTag
 	var moods []core.BeatMood

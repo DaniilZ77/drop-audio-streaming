@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/minio"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/postgres"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/redis"
@@ -223,19 +224,17 @@ func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int, e
 
 func insertTx(ctx context.Context, stmt string, beatID int, elems []int, tx *sql.Tx) error {
 	var args []any
-	args = append(args, beatID)
-	stmt = `INSERT INTO beats_genres (beat_id, genre_id)
-	VALUES`
 	cur := 1
 	for _, elem := range elems {
 		stmt += fmt.Sprintf(" ($%d, $%d),", cur, cur+1)
-		args = append(args, elem)
+		args = append(args, beatID, elem)
 		cur += 2
 	}
 	stmt = strings.TrimSuffix(stmt, ",")
 
 	_, err := tx.ExecContext(ctx, stmt, args...)
 	if err != nil {
+		logger.Log().Debug(ctx, err.Error())
 		return err
 	}
 
@@ -259,8 +258,8 @@ func (s *store) AddBeat(ctx context.Context, beat core.BeatParams) (beatID int, 
 		}
 	}()
 
-	stmt := `INSERT INTO beats (id, beatmaker_id, file_path, image_path, name, description)
-	VALUES ($1, $2, $3, $4, $5, $6)
+	stmt := `INSERT INTO beats (id, beatmaker_id, file_path, image_path, name, description, bpm)
+	VALUES ($1, $2, $3, $4, $5, $6, $7)
 	RETURNING id`
 	err = tx.QueryRowContext(
 		ctx,
@@ -270,8 +269,10 @@ func (s *store) AddBeat(ctx context.Context, beat core.BeatParams) (beatID int, 
 		beat.Beat.FilePath,
 		beat.Beat.ImagePath,
 		beat.Beat.Name,
-		beat.Beat.Description).Scan(&beatID)
+		beat.Beat.Description,
+		beat.Beat.Bpm).Scan(&beatID)
 	if err != nil {
+		logger.Log().Debug(ctx, err.Error())
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 			return 0, core.ErrBeatExists
@@ -285,6 +286,7 @@ func (s *store) AddBeat(ctx context.Context, beat core.BeatParams) (beatID int, 
 	}
 	if err := insertTx(ctx, `INSERT INTO beats_genres (beat_id, genre_id)
 	VALUES`, beatID, genres, tx); err != nil {
+		logger.Log().Debug(ctx, err.Error())
 		return 0, err
 	}
 
@@ -294,6 +296,7 @@ func (s *store) AddBeat(ctx context.Context, beat core.BeatParams) (beatID int, 
 	}
 	if err := insertTx(ctx, `INSERT INTO beats_tags (beat_id, tag_id)
 	VALUES`, beatID, tags, tx); err != nil {
+		logger.Log().Debug(ctx, err.Error())
 		return 0, err
 	}
 
@@ -301,14 +304,16 @@ func (s *store) AddBeat(ctx context.Context, beat core.BeatParams) (beatID int, 
 	for _, mood := range beat.Moods {
 		moods = append(moods, mood.MoodID)
 	}
-	if err := insertTx(ctx, `INSERT INTO beats_moods (beat_id, mood)
+	if err := insertTx(ctx, `INSERT INTO beats_moods (beat_id, mood_id)
 	VALUES`, beatID, moods, tx); err != nil {
+		logger.Log().Debug(ctx, err.Error())
 		return 0, err
 	}
 
 	_, err = tx.ExecContext(ctx, `INSERT INTO beats_notes (beat_id, note_id, scale)
 	VALUES ($1, $2, $3)`, beat.Note.BeatID, beat.Note.NoteID, beat.Note.Scale)
 	if err != nil {
+		logger.Log().Debug(ctx, err.Error())
 		return 0, err
 	}
 

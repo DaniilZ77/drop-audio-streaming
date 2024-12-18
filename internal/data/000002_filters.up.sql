@@ -80,8 +80,8 @@ values
 
 create table if not exists "beats_tags" (
     "id" serial primary key,
-    "beat_id" integer not null,
-    "tag_id" integer not null
+    "beat_id" integer not null references "beats" ("id"),
+    "tag_id" integer not null references "tags" ("id")
 );
 
 create index on "beats_tags" ("tag_id");
@@ -90,8 +90,8 @@ create type "scale" as enum ('major', 'minor');
 
 create table if not exists "beats_notes" (
     "id" serial primary key,
-    "beat_id" integer not null,
-    "note_id" integer not null,
+    "beat_id" integer not null references "beats" ("id"),
+    "note_id" integer not null references "notes" ("id"),
     "scale" scale not null
 );
 
@@ -99,8 +99,8 @@ create index on "beats_notes" ("note_id");
 
 create table if not exists "beats_moods" (
     "id" serial primary key,
-    "beat_id" integer not null,
-    "mood_id" integer not null
+    "beat_id" integer not null references "beats" ("id"),
+    "mood_id" integer not null references "moods" ("id")
 );
 
 create index on "beats_moods" ("mood_id");
