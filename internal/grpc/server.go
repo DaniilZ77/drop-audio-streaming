@@ -21,6 +21,16 @@ type server struct {
 	userClient  *userclient.Client
 }
 
+func (s *server) GetFilters(ctx context.Context, req *audiov1.GetFiltersRequest) (*audiov1.GetFiltersResponse, error) {
+	filters, err := s.beatService.GetFilters(ctx)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
+	}
+
+	return model.ToGetFiltersResponse(*filters), nil
+}
+
 func Register(gRPCServer *grpc.Server, beatService core.BeatService, userClient *userclient.Client) {
 	audiov1.RegisterAudioServiceServer(gRPCServer, &server{beatService: beatService, userClient: userClient})
 }
@@ -33,14 +43,15 @@ func (s *server) Upload(ctx context.Context, req *audiov1.UploadRequest) (*audio
 		return nil, withDetails(codes.InvalidArgument, core.ErrValidationFailed, v.Errors)
 	}
 
-	beat := model.ToCoreBeat(req)
-	beatGenre := model.ToCoreBeatGenre(req)
+	beatParams := model.ToCoreBeat(req)
 
-	filePath, imagePath, err := s.beatService.AddBeat(ctx, beat, beatGenre)
+	filePath, imagePath, err := s.beatService.AddBeat(ctx, beatParams)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatExists) {
 			return nil, status.Error(codes.AlreadyExists, err.Error())
+		} else if errors.Is(err, core.ErrInvalidFilters) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
 	}
@@ -68,7 +79,7 @@ func (s *server) GetBeat(ctx context.Context, req *audiov1.GetBeatRequest) (*aud
 		return nil, withDetails(codes.InvalidArgument, core.ErrValidationFailed, v.Errors)
 	}
 
-	beat, beatGenres, err := s.beatService.GetBeat(ctx, int(req.GetBeatId()))
+	beat, err := s.beatService.GetBeat(ctx, int(req.GetBeatId()))
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatNotFound) {
@@ -77,11 +88,11 @@ func (s *server) GetBeat(ctx context.Context, req *audiov1.GetBeatRequest) (*aud
 		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
 	}
 
-	beatmaker, err := s.userClient.GetUserByID(ctx, beat.BeatmakerID)
+	beatmaker, err := s.userClient.GetUserByID(ctx, beat.Beat.BeatmakerID)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
 	}
 
-	return model.ToGetBeatResponse(beat, beatmaker, beatGenres), nil
+	return model.ToGetBeatResponse(beat, beatmaker), nil
 }

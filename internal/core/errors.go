@@ -12,4 +12,5 @@ var (
 	ErrUnavailable             = errors.New("unavailable")
 	ErrInvalidID               = errors.New("invalid id")
 	ErrAmountOfRetriesExceeded = errors.New("amount of retries exceeded")
+	ErrInvalidFilters          = errors.New("invalid filters")
 )

@@ -12,7 +12,12 @@ import (
 func ValidateUploadRequest(v *validator.Validator, req *audiov1.UploadRequest) {
 	v.Check(validator.AtLeast(int(req.GetBeatId()), 1), "beat_id", "must be positive")
 	v.Check(validator.AtLeast(int(req.GetBeatmakerId()), 1), "beatmaker_id", "must be positive")
-	v.Check(validator.Between(len(req.GetBeatGenre()), 1, 10), "beat_genre", "must have length between 1 and 10")
+	v.Check(validator.AtLeast(len(req.GetBeatGenre()), 1), "beat_genre", "must not be empty")
+	v.Check(validator.AtLeast(int(req.GetBpm()), 1), "bpm", "must be positive")
+	v.Check(validator.AtLeast(len(req.GetBeatTag()), 1), "beat_tag", "must not be empty")
+	v.Check(validator.AtLeast(len(req.GetBeatMood()), 1), "beat_mood", "must not be empty")
+	v.Check(validator.AtLeast(int(req.GetNote().GetNoteId()), 1), "note_id", "must be positive")
+	v.Check(validator.OneOf(req.GetNote().GetScale(), "minor", "major"), "scale", "must be one of minor major")
 	v.Check(validator.Between(len(req.GetName()), 1, 80), "name", "must have length between 1 and 80")
 	v.Check(validator.Between(len(req.GetDescription()), 0, 512), "description", "must have length between 0 and 512")
 }
@@ -61,5 +66,28 @@ func ValidateStream(v *validator.Validator, idStr string, id *int) {
 	} else {
 		*id, _ = strconv.Atoi(idStr)
 		v.Check(validator.AtLeast(*id, 1), "id", "must be positive")
+	}
+}
+
+func ValidateGetBeatFiltered(v *validator.Validator, filters core.FeedFilter) {
+	for i := range filters.Genres {
+		v.Check(validator.AtLeast(filters.Genres[i], 1), "genre_id", "must be positive")
+	}
+
+	for i := range filters.Moods {
+		v.Check(validator.AtLeast(filters.Moods[i], 1), "mood_id", "must be positive")
+	}
+
+	for i := range filters.Tags {
+		v.Check(validator.AtLeast(filters.Tags[i], 1), "tag_id", "must be positive")
+	}
+
+	if filters.Note != nil {
+		v.Check(validator.AtLeast(filters.Note.NoteID, 1), "note_id", "must be positive")
+		v.Check(validator.OneOf(filters.Note.Scale, "minor", "major"), "scale", "must be one of minor or major")
+	}
+
+	if filters.Bpm != nil {
+		v.Check(validator.AtLeast(*filters.Bpm, 1), "bpm", "must be positive")
 	}
 }

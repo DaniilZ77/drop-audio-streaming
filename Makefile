@@ -30,7 +30,7 @@ coverage: ### generate coverage report
 	go test ${TEST_FLAGS} -coverprofile=coverage.out ./...
 	go tool cover -html="coverage.out"
 
-MIGRATION_NAME=initial
+MIGRATION_NAME=filters
 
 migrate-new: ### create a new migration
 	migrate create -ext sql -dir ./internal/data -seq ${MIGRATION_NAME}

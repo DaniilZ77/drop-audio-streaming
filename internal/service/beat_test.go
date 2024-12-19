@@ -124,26 +124,30 @@ func TestAddBeat(t *testing.T) {
 
 	beatService := New(beatStorage, 0)
 
-	beat := core.Beat{
-		ID:   1,
-		Name: "beat1",
-	}
-	beatGenre := []core.BeatGenre{
-		{
-			Genre: "genre1",
+	beat := core.BeatParams{
+		Beat: core.Beat{
+			ID:   1,
+			Name: "beat1",
+		},
+		Genres: []core.BeatGenre{
+			{
+				ID:      1,
+				BeatID:  1,
+				GenreID: 1,
+			},
 		},
 	}
 	var path string
 
 	beatStorage.EXPECT().
-		AddBeat(mock.Anything, mock.MatchedBy(func(beat core.Beat) bool {
-			path = beat.FilePath
-			return beat.ID == 1 && beat.Name == "beat1"
-		}), beatGenre).
+		AddBeat(mock.Anything, mock.MatchedBy(func(beat core.BeatParams) bool {
+			path = beat.Beat.FilePath
+			return beat.Beat.ID == 1 && beat.Beat.Name == "beat1"
+		})).
 		Return(1, nil).
 		Once()
 
-	beatPath, _, err := beatService.AddBeat(ctx, beat, beatGenre)
+	beatPath, _, err := beatService.AddBeat(ctx, beat)
 	require.NoError(t, err)
 	assert.Equal(t, path, beatPath)
 }
@@ -155,18 +159,22 @@ func TestAddBeat_BeatExists(t *testing.T) {
 
 	beatService := New(beatStorage, 0)
 
-	beat := core.Beat{
-		ID:   1,
-		Name: "beat1",
-	}
-	beatGenre := []core.BeatGenre{
-		{
-			Genre: "genre1",
+	beat := core.BeatParams{
+		Beat: core.Beat{
+			ID:   1,
+			Name: "beat1",
+		},
+		Genres: []core.BeatGenre{
+			{
+				ID:      1,
+				BeatID:  1,
+				GenreID: 1,
+			},
 		},
 	}
 
 	beatStorage.EXPECT().
-		AddBeat(mock.Anything, mock.Anything, mock.Anything).
+		AddBeat(mock.Anything, mock.Anything).
 		Return(0, core.ErrBeatExists).
 		Once()
 	beatStorage.EXPECT().
@@ -176,7 +184,7 @@ func TestAddBeat_BeatExists(t *testing.T) {
 		}, nil).
 		Once()
 
-	beatPath, _, err := beatService.AddBeat(ctx, beat, beatGenre)
+	beatPath, _, err := beatService.AddBeat(ctx, beat)
 	require.NoError(t, err)
 	assert.Equal(t, "path/to/beat1", beatPath)
 }
@@ -188,22 +196,26 @@ func TestAddBeat_Fail(t *testing.T) {
 
 	beatService := New(beatStorage, 0)
 
-	beat := core.Beat{
-		ID:   1,
-		Name: "beat1",
-	}
-	beatGenre := []core.BeatGenre{
-		{
-			Genre: "genre1",
+	beat := core.BeatParams{
+		Beat: core.Beat{
+			ID:   1,
+			Name: "beat1",
+		},
+		Genres: []core.BeatGenre{
+			{
+				ID:      1,
+				BeatID:  1,
+				GenreID: 1,
+			},
 		},
 	}
 
 	beatStorage.EXPECT().
-		AddBeat(mock.Anything, mock.Anything, mock.Anything).
+		AddBeat(mock.Anything, mock.Anything).
 		Return(0, errors.New("db error")).
 		Once()
 
-	_, _, err := beatService.AddBeat(ctx, beat, beatGenre)
+	_, _, err := beatService.AddBeat(ctx, beat)
 	assert.Error(t, err)
 }
 
@@ -216,7 +228,7 @@ func TestGetBeatByFilter(t *testing.T) {
 
 	userID := 2
 	filter := core.FeedFilter{
-		Genre: "genre1",
+		Genres: []int{1},
 	}
 
 	beatStorage.EXPECT().
@@ -225,21 +237,31 @@ func TestGetBeatByFilter(t *testing.T) {
 		Once()
 	beatStorage.EXPECT().
 		GetBeatByFilter(mock.Anything, filter, []string{"path/to/beat1"}).
-		Return(&core.Beat{
-			ID:   1,
-			Name: "beat1",
-		}, &[]string{"genre1"}[0], nil).
+		Return(&core.BeatParams{
+			Beat: core.Beat{
+				ID:   1,
+				Name: "beat1",
+			},
+			Genres: []core.BeatGenre{
+				{
+					ID:      1,
+					BeatID:  1,
+					GenreID: 1,
+				},
+			},
+		}, nil).
 		Once()
 	beatStorage.EXPECT().
 		ReplaceUserSeenBeat(mock.Anything, userID, 1).
 		Return(nil).
 		Once()
 
-	beat, genre, err := beatService.GetBeatByFilter(ctx, userID, filter)
+	beat, err := beatService.GetBeatByFilter(ctx, userID, filter)
 	require.NoError(t, err)
-	assert.Equal(t, "beat1", beat.Name)
-	assert.Equal(t, 1, beat.ID)
-	assert.Equal(t, "genre1", *genre)
+	assert.Equal(t, "beat1", beat.Beat.Name)
+	assert.Equal(t, 1, beat.Beat.ID)
+	require.Len(t, beat.Genres, 1)
+	assert.Equal(t, 1, beat.Genres[0].GenreID)
 }
 
 func TestGetBeatByFilter_Fail(t *testing.T) {
@@ -251,7 +273,7 @@ func TestGetBeatByFilter_Fail(t *testing.T) {
 
 	userID := 2
 	filter := core.FeedFilter{
-		Genre: "genre1",
+		Genres: []int{1},
 	}
 
 	beatStorage.EXPECT().
@@ -260,10 +282,10 @@ func TestGetBeatByFilter_Fail(t *testing.T) {
 		Once()
 	beatStorage.EXPECT().
 		GetBeatByFilter(mock.Anything, filter, []string{"path/to/beat1"}).
-		Return(nil, nil, errors.New("db error")).
+		Return(nil, errors.New("db error")).
 		Once()
 
-	_, _, err := beatService.GetBeatByFilter(ctx, userID, filter)
+	_, err := beatService.GetBeatByFilter(ctx, userID, filter)
 	assert.Error(t, err)
 }
 
@@ -276,7 +298,7 @@ func TestGetBeatByFilter_NotFound(t *testing.T) {
 
 	userID := 2
 	filter := core.FeedFilter{
-		Genre: "genre1",
+		Genres: []int{1},
 	}
 
 	beatStorage.EXPECT().
@@ -285,7 +307,7 @@ func TestGetBeatByFilter_NotFound(t *testing.T) {
 		Once()
 	beatStorage.EXPECT().
 		GetBeatByFilter(mock.Anything, filter, []string{"path/to/beat1"}).
-		Return(nil, nil, core.ErrBeatNotFound).
+		Return(nil, core.ErrBeatNotFound).
 		Once()
 	beatStorage.EXPECT().
 		ClearUserSeenBeats(mock.Anything, userID).
@@ -293,19 +315,29 @@ func TestGetBeatByFilter_NotFound(t *testing.T) {
 		Once()
 	beatStorage.EXPECT().
 		GetBeatByFilter(mock.Anything, filter, []string{}).
-		Return(&core.Beat{
-			ID:   1,
-			Name: "beat1",
-		}, &[]string{"genre1"}[0], nil).
+		Return(&core.BeatParams{
+			Beat: core.Beat{
+				ID:   1,
+				Name: "beat1",
+			},
+			Genres: []core.BeatGenre{
+				{
+					ID:      1,
+					BeatID:  1,
+					GenreID: 1,
+				},
+			},
+		}, nil).
 		Once()
 	beatStorage.EXPECT().
 		ReplaceUserSeenBeat(mock.Anything, userID, 1).
 		Return(nil).
 		Once()
 
-	beat, genre, err := beatService.GetBeatByFilter(ctx, userID, filter)
+	beat, err := beatService.GetBeatByFilter(ctx, userID, filter)
 	require.NoError(t, err)
-	assert.Equal(t, "beat1", beat.Name)
-	assert.Equal(t, 1, beat.ID)
-	assert.Equal(t, "genre1", *genre)
+	assert.Equal(t, "beat1", beat.Beat.Name)
+	assert.Equal(t, 1, beat.Beat.ID)
+	require.Len(t, beat.Genres, 1)
+	assert.Equal(t, 1, beat.Genres[0].GenreID)
 }
