@@ -43,6 +43,9 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 		if errors.Is(err, core.ErrBeatNotFound) {
 			errorResponse(ctx, w, http.StatusNotFound, core.ErrBeatNotFound, nil)
 			return
+		} else if errors.Is(err, core.ErrInvalidRange) {
+			errorResponse(ctx, w, http.StatusBadRequest, core.ErrInvalidRange, nil)
+			return
 		}
 		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)
 		return
@@ -100,7 +103,7 @@ func (r *Router) getBeat(w http.ResponseWriter, req *http.Request, params map[st
 		return
 	}
 
-	imageURL, err := r.beatService.GetUploadURL(ctx, beat.Beat.ImagePath)
+	imageURL, err := r.beatService.GetDownloadURL(ctx, beat.Beat.ImagePath)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		errorResponse(ctx, w, http.StatusInternalServerError, core.ErrInternal, nil)

@@ -510,27 +510,27 @@ func (_c *MockBeatStorage_GetFullBeatByID_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
-// GetPresignedURL provides a mock function with given fields: ctx, beatPath, expiry
-func (_m *MockBeatStorage) GetPresignedURL(ctx context.Context, beatPath string, expiry time.Duration) (string, error) {
-	ret := _m.Called(ctx, beatPath, expiry)
+// GetPresignedURLGet provides a mock function with given fields: ctx, path, expiry
+func (_m *MockBeatStorage) GetPresignedURLGet(ctx context.Context, path string, expiry time.Duration) (string, error) {
+	ret := _m.Called(ctx, path, expiry)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetPresignedURL")
+		panic("no return value specified for GetPresignedURLGet")
 	}
 
 	var r0 string
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, time.Duration) (string, error)); ok {
-		return rf(ctx, beatPath, expiry)
+		return rf(ctx, path, expiry)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, time.Duration) string); ok {
-		r0 = rf(ctx, beatPath, expiry)
+		r0 = rf(ctx, path, expiry)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, time.Duration) error); ok {
-		r1 = rf(ctx, beatPath, expiry)
+		r1 = rf(ctx, path, expiry)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -538,32 +538,90 @@ func (_m *MockBeatStorage) GetPresignedURL(ctx context.Context, beatPath string,
 	return r0, r1
 }
 
-// MockBeatStorage_GetPresignedURL_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPresignedURL'
-type MockBeatStorage_GetPresignedURL_Call struct {
+// MockBeatStorage_GetPresignedURLGet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPresignedURLGet'
+type MockBeatStorage_GetPresignedURLGet_Call struct {
 	*mock.Call
 }
 
-// GetPresignedURL is a helper method to define mock.On call
+// GetPresignedURLGet is a helper method to define mock.On call
 //   - ctx context.Context
-//   - beatPath string
+//   - path string
 //   - expiry time.Duration
-func (_e *MockBeatStorage_Expecter) GetPresignedURL(ctx interface{}, beatPath interface{}, expiry interface{}) *MockBeatStorage_GetPresignedURL_Call {
-	return &MockBeatStorage_GetPresignedURL_Call{Call: _e.mock.On("GetPresignedURL", ctx, beatPath, expiry)}
+func (_e *MockBeatStorage_Expecter) GetPresignedURLGet(ctx interface{}, path interface{}, expiry interface{}) *MockBeatStorage_GetPresignedURLGet_Call {
+	return &MockBeatStorage_GetPresignedURLGet_Call{Call: _e.mock.On("GetPresignedURLGet", ctx, path, expiry)}
 }
 
-func (_c *MockBeatStorage_GetPresignedURL_Call) Run(run func(ctx context.Context, beatPath string, expiry time.Duration)) *MockBeatStorage_GetPresignedURL_Call {
+func (_c *MockBeatStorage_GetPresignedURLGet_Call) Run(run func(ctx context.Context, path string, expiry time.Duration)) *MockBeatStorage_GetPresignedURLGet_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(time.Duration))
 	})
 	return _c
 }
 
-func (_c *MockBeatStorage_GetPresignedURL_Call) Return(url string, err error) *MockBeatStorage_GetPresignedURL_Call {
+func (_c *MockBeatStorage_GetPresignedURLGet_Call) Return(url string, err error) *MockBeatStorage_GetPresignedURLGet_Call {
 	_c.Call.Return(url, err)
 	return _c
 }
 
-func (_c *MockBeatStorage_GetPresignedURL_Call) RunAndReturn(run func(context.Context, string, time.Duration) (string, error)) *MockBeatStorage_GetPresignedURL_Call {
+func (_c *MockBeatStorage_GetPresignedURLGet_Call) RunAndReturn(run func(context.Context, string, time.Duration) (string, error)) *MockBeatStorage_GetPresignedURLGet_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetPresignedURLPut provides a mock function with given fields: ctx, path, expiry
+func (_m *MockBeatStorage) GetPresignedURLPut(ctx context.Context, path string, expiry time.Duration) (string, error) {
+	ret := _m.Called(ctx, path, expiry)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPresignedURLPut")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, time.Duration) (string, error)); ok {
+		return rf(ctx, path, expiry)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, time.Duration) string); ok {
+		r0 = rf(ctx, path, expiry)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, time.Duration) error); ok {
+		r1 = rf(ctx, path, expiry)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockBeatStorage_GetPresignedURLPut_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPresignedURLPut'
+type MockBeatStorage_GetPresignedURLPut_Call struct {
+	*mock.Call
+}
+
+// GetPresignedURLPut is a helper method to define mock.On call
+//   - ctx context.Context
+//   - path string
+//   - expiry time.Duration
+func (_e *MockBeatStorage_Expecter) GetPresignedURLPut(ctx interface{}, path interface{}, expiry interface{}) *MockBeatStorage_GetPresignedURLPut_Call {
+	return &MockBeatStorage_GetPresignedURLPut_Call{Call: _e.mock.On("GetPresignedURLPut", ctx, path, expiry)}
+}
+
+func (_c *MockBeatStorage_GetPresignedURLPut_Call) Run(run func(ctx context.Context, path string, expiry time.Duration)) *MockBeatStorage_GetPresignedURLPut_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(time.Duration))
+	})
+	return _c
+}
+
+func (_c *MockBeatStorage_GetPresignedURLPut_Call) Return(url string, err error) *MockBeatStorage_GetPresignedURLPut_Call {
+	_c.Call.Return(url, err)
+	return _c
+}
+
+func (_c *MockBeatStorage_GetPresignedURLPut_Call) RunAndReturn(run func(context.Context, string, time.Duration) (string, error)) *MockBeatStorage_GetPresignedURLPut_Call {
 	_c.Call.Return(run)
 	return _c
 }

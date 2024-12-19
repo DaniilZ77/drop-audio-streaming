@@ -27,6 +27,9 @@ spec:
               name: nginx-streaming
               readOnly: true
               subPath: nginx.conf
+            - mountPath: /etc/nginx/tls
+              name: nginx-streaming-tls
+              readOnly: true
           resources:
             limits:
               memory: "512Mi"
@@ -42,3 +45,12 @@ spec:
                 path: nginx.conf
             name: nginx-streaming
           name: nginx-streaming
+        - name: nginx-streaming-tls
+          secret:
+            secretName: nginx-streaming-tls
+            items:
+              - key: tls.crt
+                path: cert.pem
+              - key: tls.key
+                path: key.pem
+          

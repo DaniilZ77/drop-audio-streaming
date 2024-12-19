@@ -50,6 +50,8 @@ func (s *server) Upload(ctx context.Context, req *audiov1.UploadRequest) (*audio
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, core.ErrBeatExists) {
 			return nil, status.Error(codes.AlreadyExists, err.Error())
+		} else if errors.Is(err, core.ErrInvalidFilters) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 		return nil, status.Error(codes.Internal, core.ErrInternal.Error())
 	}

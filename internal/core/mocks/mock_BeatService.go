@@ -349,6 +349,63 @@ func (_c *MockBeatService_GetBeatsByBeatmakerID_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// GetDownloadURL provides a mock function with given fields: ctx, imagePath
+func (_m *MockBeatService) GetDownloadURL(ctx context.Context, imagePath string) (string, error) {
+	ret := _m.Called(ctx, imagePath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDownloadURL")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, imagePath)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, imagePath)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, imagePath)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockBeatService_GetDownloadURL_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDownloadURL'
+type MockBeatService_GetDownloadURL_Call struct {
+	*mock.Call
+}
+
+// GetDownloadURL is a helper method to define mock.On call
+//   - ctx context.Context
+//   - imagePath string
+func (_e *MockBeatService_Expecter) GetDownloadURL(ctx interface{}, imagePath interface{}) *MockBeatService_GetDownloadURL_Call {
+	return &MockBeatService_GetDownloadURL_Call{Call: _e.mock.On("GetDownloadURL", ctx, imagePath)}
+}
+
+func (_c *MockBeatService_GetDownloadURL_Call) Run(run func(ctx context.Context, imagePath string)) *MockBeatService_GetDownloadURL_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockBeatService_GetDownloadURL_Call) Return(url string, err error) *MockBeatService_GetDownloadURL_Call {
+	_c.Call.Return(url, err)
+	return _c
+}
+
+func (_c *MockBeatService_GetDownloadURL_Call) RunAndReturn(run func(context.Context, string) (string, error)) *MockBeatService_GetDownloadURL_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetFilters provides a mock function with given fields: ctx
 func (_m *MockBeatService) GetFilters(ctx context.Context) (*core.Filters, error) {
 	ret := _m.Called(ctx)

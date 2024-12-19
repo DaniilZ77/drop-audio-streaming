@@ -17,12 +17,12 @@ type service struct {
 	uploadURLTTL int
 }
 
-func (s *service) GetFilters(ctx context.Context) (*core.Filters, error) {
-	return s.beatStore.GetFilters(ctx)
-}
-
 func New(beatStore core.BeatStorage, uploadURLTTL int) core.BeatService {
 	return &service{beatStore: beatStore, uploadURLTTL: uploadURLTTL}
+}
+
+func (s *service) GetFilters(ctx context.Context) (*core.Filters, error) {
+	return s.beatStore.GetFilters(ctx)
 }
 
 func (s *service) GetBeatFromS3(ctx context.Context, beatID, start int, end *int) (obj io.ReadCloser, size int, contentType string, err error) {
@@ -115,7 +115,16 @@ func (s *service) AddBeat(ctx context.Context, beat core.BeatParams) (filePath, 
 }
 
 func (s *service) GetUploadURL(ctx context.Context, beatPath string) (string, error) {
-	path, err := s.beatStore.GetPresignedURL(ctx, beatPath, time.Duration(s.uploadURLTTL)*time.Minute)
+	path, err := s.beatStore.GetPresignedURLPut(ctx, beatPath, time.Duration(s.uploadURLTTL)*time.Minute)
+	if err != nil {
+		return "", err
+	}
+
+	return path, nil
+}
+
+func (s *service) GetDownloadURL(ctx context.Context, imagePath string) (url string, err error) {
+	path, err := s.beatStore.GetPresignedURLGet(ctx, imagePath, time.Duration(s.uploadURLTTL)*time.Minute)
 	if err != nil {
 		return "", err
 	}

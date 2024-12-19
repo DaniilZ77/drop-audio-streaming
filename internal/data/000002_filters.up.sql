@@ -117,3 +117,7 @@ drop column "genre";
 
 alter table "beats"
 add column "bpm" integer not null;
+
+alter table "beats_genres"
+add constraint "beats_genres_beat_id_fkey"
+foreign key ("beat_id") references "beats" ("id");

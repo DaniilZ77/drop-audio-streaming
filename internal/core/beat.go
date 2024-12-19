@@ -12,7 +12,8 @@ type (
 		GetFullBeatByID(ctx context.Context, id int, param IsDownloaded) (*BeatParams, error)
 		GetBeatByID(ctx context.Context, id int, param IsDownloaded) (*Beat, error)
 		AddBeat(ctx context.Context, beat BeatParams) (beatID int, err error)
-		GetPresignedURL(ctx context.Context, beatPath string, expiry time.Duration) (url string, err error)
+		GetPresignedURLPut(ctx context.Context, path string, expiry time.Duration) (url string, err error)
+		GetPresignedURLGet(ctx context.Context, path string, expiry time.Duration) (url string, err error)
 		GetBeatByFilter(ctx context.Context, filter FeedFilter, seen []string) (beat *BeatParams, err error)
 		GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p GetBeatsParams) (beats []BeatParams, total int, err error)
 
@@ -31,6 +32,7 @@ type (
 		GetBeat(ctx context.Context, beatID int) (beat *BeatParams, err error)
 		GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p GetBeatsParams) (beats []BeatParams, total int, err error)
 		GetFilters(ctx context.Context) (*Filters, error)
+		GetDownloadURL(ctx context.Context, imagePath string) (url string, err error)
 	}
 
 	FeedFilter struct {
