@@ -3,7 +3,7 @@ module github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming
 go 1.23.1
 
 require (
-	github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.0.57
+	github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.0.69
 	github.com/docker/go-connections v0.5.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang-migrate/migrate/v4 v4.18.1

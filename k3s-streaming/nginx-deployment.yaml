@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx-streaming
+  name: nginx-streaming
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-streaming
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: nginx-streaming
+    spec:
+      containers:
+        - image: nginx:alpine
+          name: nginx-streaming
+          ports:
+            - containerPort: 9000
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/nginx/nginx.conf
+              name: nginx-streaming
+              readOnly: true
+              subPath: nginx.conf
+            - mountPath: /etc/nginx/tls
+              name: nginx-streaming-tls
+              readOnly: true
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+            name: nginx-streaming
+          name: nginx-streaming
+        - name: nginx-streaming-tls
+          secret:
+            secretName: nginx-streaming-tls
+            items:
+              - key: tls.crt
+                path: cert.pem
+              - key: tls.key
+                path: key.pem
+          

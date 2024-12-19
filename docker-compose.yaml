@@ -7,7 +7,7 @@ services:
       - .env
     ports:
       - "50052:50052"
-      - "8081:8081"
+      - "8083:8081"
     networks:
       - drop-audio-streaming
       - drop-shared
@@ -42,7 +42,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
-  
+
   redis:
     image: redis:alpine
     container_name: redis-streaming
@@ -62,7 +62,7 @@ services:
       retries: 3
       start_period: 20s
     command: /bin/sh -c "redis-server --requirepass ${REDIS_PASSWORD}"
-  
+
   minio:
     image: minio/minio
     container_name: minio-streaming
@@ -82,8 +82,8 @@ services:
       MINIO_NOTIFY_POSTGRES_FORMAT_PRIMARY: access
       MINIO_NOTIFY_POSTGRES_TABLE_PRIMARY: ${MINIO_EVENTS_TABLE}
       MINIO_NOTIFY_POSTGRES_CONNECTION_STRING_PRIMARY: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
-    command: server --console-address ":8090" /var/lib/minio/data
-  
+    command: server --console-address ":8090" --address ":9000" /var/lib/minio/data
+
   mc:
     image: minio/mc
     container_name: mc-streaming
@@ -101,6 +101,18 @@ services:
       "
     networks:
       - drop-audio-streaming
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-streaming
+    restart: always
+    networks:
+      - drop-audio-streaming
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./tls:/etc/nginx/tls:ro
 
 volumes:
   postgres-data:

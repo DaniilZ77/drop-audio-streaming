@@ -67,14 +67,13 @@ func New(
 
 func (app *App) MustRun(ctx context.Context) {
 	if err := app.Run(ctx); err != nil {
-		logger.Log().Fatal(ctx, "Failed to run http server: %w", err)
+		logger.Log().Fatal(ctx, "Failed to run http server: %v", err)
 	}
 }
 
 func (app *App) Run(ctx context.Context) error {
 	logger.Log().Info(ctx, "http server started on %s", app.httpServer.Addr)
-	// return app.httpServer.ListenAndServeTLS(app.cert, app.key) nolint
-	return app.httpServer.ListenAndServe()
+	return app.httpServer.ListenAndServeTLS(app.cert, app.key)
 }
 
 func (app *App) Stop(ctx context.Context) {
