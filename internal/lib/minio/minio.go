@@ -31,8 +31,6 @@ type Minio struct {
 }
 
 func New(ctx context.Context, config MinioConfig, opts ...Option) (*Minio, error) {
-	// TODO: figure out how to set max pool size
-
 	m := &Minio{
 		connAttempts: _defaultConnAttempts,
 		connTimeout:  _defaultConnTimeout,
@@ -53,12 +51,12 @@ func New(ctx context.Context, config MinioConfig, opts ...Option) (*Minio, error
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
 	var exists bool
+
 	for m.connAttempts > 0 {
+		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		exists, err = m.Client.BucketExists(ctx, config.Bucket)
+		cancel()
 		if err == nil {
 			break
 		}

@@ -6,7 +6,7 @@
   },
   "tags": [
     {
-      "name": "AudioService"
+      "name": "BeatService"
     }
   ],
   "consumes": [
@@ -16,14 +16,14 @@
     "application/json"
   ],
   "paths": {
-    "/v1/audio": {
+    "/v1/beat": {
       "post": {
-        "operationId": "AudioService_Upload",
+        "operationId": "BeatService_UploadBeat",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/audioUploadResponse"
+              "$ref": "#/definitions/audioUploadBeatResponse"
             }
           },
           "default": {
@@ -39,23 +39,23 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/audioUploadRequest"
+              "$ref": "#/definitions/audioUploadBeatRequest"
             }
           }
         ],
         "tags": [
-          "AudioService"
+          "BeatService"
         ]
       }
     },
-    "/v1/audio/filters": {
+    "/v1/beat/params": {
       "get": {
-        "operationId": "AudioService_GetFilters",
+        "operationId": "BeatService_GetBeatParams",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/audioGetFiltersResponse"
+              "$ref": "#/definitions/audioGetBeatParamsResponse"
             }
           },
           "default": {
@@ -66,18 +66,18 @@
           }
         },
         "tags": [
-          "AudioService"
+          "BeatService"
         ]
       }
     },
-    "/v1/audio/{beatId}": {
-      "get": {
-        "operationId": "AudioService_GetBeat",
+    "/v1/beat/{beatId}": {
+      "delete": {
+        "operationId": "BeatService_DeleteBeat",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/audioGetBeatResponse"
+              "$ref": "#/definitions/audioDeleteBeatResponse"
             }
           },
           "default": {
@@ -97,54 +97,192 @@
           }
         ],
         "tags": [
-          "AudioService"
+          "BeatService"
+        ]
+      },
+      "patch": {
+        "operationId": "BeatService_UpdateBeat",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/audioUpdateBeatResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "beatId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/BeatServiceUpdateBeatBody"
+            }
+          }
+        ],
+        "tags": [
+          "BeatService"
+        ]
+      }
+    },
+    "/v1/beats": {
+      "get": {
+        "operationId": "BeatService_GetBeats",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/audioGetBeatsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "beatId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "genre",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "mood",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "note.name",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "note.scale",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "MINOR",
+              "MAJOR"
+            ],
+            "default": "MINOR"
+          },
+          {
+            "name": "beatmakerId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "beatName",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "bpm",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "orderBy.order",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "default": "ASC"
+          },
+          {
+            "name": "orderBy.field",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "isDownloaded",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "BeatService"
         ]
       }
     }
   },
   "definitions": {
-    "audioBeatmaker": {
+    "BeatServiceUpdateBeatBody": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string",
-          "format": "int64"
-        },
-        "username": {
-          "type": "string"
-        },
-        "pseudonym": {
-          "type": "string"
-        }
-      }
-    },
-    "audioGenre": {
-      "type": "object",
-      "properties": {
-        "genreId": {
-          "type": "string",
-          "format": "int64"
-        },
-        "name": {
-          "type": "string"
-        }
-      }
-    },
-    "audioGetBeatResponse": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "int64"
-        },
         "name": {
           "type": "string"
         },
         "description": {
           "type": "string"
-        },
-        "beatmaker": {
-          "$ref": "#/definitions/audioBeatmaker"
         },
         "beatGenre": {
           "type": "array",
@@ -168,48 +306,160 @@
           }
         },
         "note": {
-          "$ref": "#/definitions/audioNoteUpload"
+          "$ref": "#/definitions/audioUpdateBeatNote"
         },
         "bpm": {
           "type": "string",
           "format": "int64"
+        },
+        "updateImage": {
+          "type": "boolean"
+        },
+        "updateFile": {
+          "type": "boolean"
         }
       }
     },
-    "audioGetFiltersResponse": {
+    "audioBeat": {
+      "type": "object",
+      "properties": {
+        "beatId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "beatmaker": {
+          "$ref": "#/definitions/audioBeatmaker"
+        },
+        "image": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "genre": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tag": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "mood": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "note": {
+          "$ref": "#/definitions/audioGetBeatsNote"
+        },
+        "bpm": {
+          "type": "string",
+          "format": "int64"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "audioBeatmaker": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "username": {
+          "type": "string"
+        },
+        "pseudonym": {
+          "type": "string"
+        }
+      }
+    },
+    "audioDeleteBeatResponse": {
+      "type": "object"
+    },
+    "audioGenreParam": {
+      "type": "object",
+      "properties": {
+        "genreId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "audioGetBeatParamsResponse": {
       "type": "object",
       "properties": {
         "genres": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/audioGenre"
+            "$ref": "#/definitions/audioGenreParam"
           }
         },
         "tags": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/audioTag"
+            "$ref": "#/definitions/audioTagParam"
           }
         },
         "moods": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/audioMood"
+            "$ref": "#/definitions/audioMoodParam"
           }
         },
         "notes": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/audioNote"
+            "$ref": "#/definitions/audioNoteParam"
           }
         }
       }
     },
-    "audioMood": {
+    "audioGetBeatsNote": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "scale": {
+          "$ref": "#/definitions/audioScale"
+        }
+      }
+    },
+    "audioGetBeatsResponse": {
+      "type": "object",
+      "properties": {
+        "pagination": {
+          "$ref": "#/definitions/audioPagination"
+        },
+        "beats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/audioBeat"
+          }
+        }
+      }
+    },
+    "audioMoodParam": {
       "type": "object",
       "properties": {
         "moodId": {
@@ -221,7 +471,7 @@
         }
       }
     },
-    "audioNote": {
+    "audioNoteParam": {
       "type": "object",
       "properties": {
         "noteId": {
@@ -233,19 +483,55 @@
         }
       }
     },
-    "audioNoteUpload": {
+    "audioOrder": {
+      "type": "string",
+      "enum": [
+        "ASC",
+        "DESC"
+      ],
+      "default": "ASC"
+    },
+    "audioOrderBy": {
       "type": "object",
       "properties": {
-        "noteId": {
-          "type": "string",
-          "format": "int64"
+        "order": {
+          "$ref": "#/definitions/audioOrder"
         },
-        "scale": {
+        "field": {
           "type": "string"
         }
       }
     },
-    "audioTag": {
+    "audioPagination": {
+      "type": "object",
+      "properties": {
+        "pages": {
+          "type": "string",
+          "format": "int64"
+        },
+        "curPage": {
+          "type": "string",
+          "format": "int64"
+        },
+        "records": {
+          "type": "string",
+          "format": "int64"
+        },
+        "recordsPerPage": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "audioScale": {
+      "type": "string",
+      "enum": [
+        "MINOR",
+        "MAJOR"
+      ],
+      "default": "MINOR"
+    },
+    "audioTagParam": {
       "type": "object",
       "properties": {
         "tagId": {
@@ -257,7 +543,42 @@
         }
       }
     },
-    "audioUploadRequest": {
+    "audioUpdateBeatNote": {
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "scale": {
+          "$ref": "#/definitions/audioScale"
+        }
+      }
+    },
+    "audioUpdateBeatResponse": {
+      "type": "object",
+      "properties": {
+        "fileUploadUrl": {
+          "type": "string"
+        },
+        "imageUploadUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "audioUploadBeatNote": {
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "scale": {
+          "$ref": "#/definitions/audioScale"
+        }
+      }
+    },
+    "audioUploadBeatRequest": {
       "type": "object",
       "properties": {
         "beatId": {
@@ -296,7 +617,7 @@
           }
         },
         "note": {
-          "$ref": "#/definitions/audioNoteUpload"
+          "$ref": "#/definitions/audioUploadBeatNote"
         },
         "bpm": {
           "type": "string",
@@ -304,7 +625,7 @@
         }
       }
     },
-    "audioUploadResponse": {
+    "audioUploadBeatResponse": {
       "type": "object",
       "properties": {
         "fileUploadUrl": {

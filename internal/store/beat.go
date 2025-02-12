@@ -6,702 +6,448 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
+	miniolib "github.com/minio/minio-go/v7"
+
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/minio"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/postgres"
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/redis"
-	"github.com/jackc/pgerrcode"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5/pgconn"
-	miniolib "github.com/minio/minio-go/v7"
-	redislib "github.com/redis/go-redis/v9"
 )
 
-const (
-	redisRetries = 7
-)
-
-type store struct {
+type BeatStore struct {
 	*minio.Minio
 	*postgres.Postgres
+	queries    *generated.Queries
 	bucketName string
-	*redis.Redis
-	userHistory int
 }
 
 func New(
 	m *minio.Minio,
 	pg *postgres.Postgres,
-	bucketName string,
-	rdb *redis.Redis,
-	userHistory int) core.BeatStorage {
-	return &store{m, pg, bucketName, rdb, userHistory}
+	bucketName string) *BeatStore {
+	return &BeatStore{m, pg, generated.New(pg.DB), bucketName}
 }
 
-func getFullBeatByID(ctx context.Context, tx *sql.Tx, beat core.Beat) (*core.BeatParams, error) {
-	var tags []core.BeatTag
-	stmt := `SELECT tag_id FROM beats_tags WHERE beat_id = $1`
-	res, err := tx.QueryContext(ctx, stmt, beat.ID)
+func (s *BeatStore) SaveBeat(ctx context.Context, beat model.SaveBeatParams) (err error) {
+	tx, err := s.DB.Begin(ctx)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		return nil, err
-	}
-	for res.Next() {
-		var tag core.BeatTag
-		err = res.Scan(&tag.TagID)
-		if err != nil {
-			return nil, err
-		}
-
-		tags = append(tags, tag)
-	}
-	if err := res.Err(); err != nil {
-		logger.Log().Error(ctx, err.Error())
-		return nil, err
+		return err
 	}
 
-	var moods []core.BeatMood
-	stmt = `SELECT mood_id FROM beats_moods WHERE beat_id = $1`
-	res, err = tx.QueryContext(ctx, stmt, beat.ID)
-	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		return nil, err
-	}
-	for res.Next() {
-		var mood core.BeatMood
-		err = res.Scan(&mood.MoodID)
-		if err != nil {
-			return nil, err
-		}
+	defer tx.Rollback(ctx)
 
-		moods = append(moods, mood)
-	}
-	if err := res.Err(); err != nil {
-		logger.Log().Error(ctx, err.Error())
-		return nil, err
-	}
+	qtx := s.queries.WithTx(tx)
 
-	var genres []core.BeatGenre
-	stmt = `SELECT genre_id FROM beats_genres WHERE beat_id = $1`
-	res, err = tx.QueryContext(ctx, stmt, beat.ID)
-	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		return nil, err
-	}
-	for res.Next() {
-		var genre core.BeatGenre
-		err = res.Scan(&genre.GenreID)
-		if err != nil {
-			return nil, err
-		}
-
-		genres = append(genres, genre)
-	}
-	if err := res.Err(); err != nil {
-		logger.Log().Error(ctx, err.Error())
-		return nil, err
-	}
-
-	var note core.BeatNote
-	stmt = `SELECT note_id, scale FROM beats_notes WHERE beat_id = $1`
-	err = tx.QueryRowContext(ctx, stmt, beat.ID).Scan(&note.NoteID, &note.Scale)
-	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		return nil, err
-	}
-
-	return &core.BeatParams{
-		Beat:   beat,
-		Tags:   tags,
-		Moods:  moods,
-		Genres: genres,
-		Note:   note,
-	}, nil
-}
-
-func (s *store) GetFullBeatByID(ctx context.Context, id int, param core.IsDownloaded) (*core.BeatParams, error) {
-	stmt := `SELECT id, beatmaker_id, file_path, image_path, name, bpm, description,
-	is_file_downloaded, is_image_downloaded, is_deleted, created_at, updated_at
-	FROM beats
-	WHERE id = $1
-	AND is_deleted = false
-	AND is_file_downloaded = true
-	AND is_image_downloaded = true`
-
-	tx, err := s.DB.Begin()
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		if err != nil {
-			tx.Rollback() // nolint
-		} else {
-			tx.Commit() // nolint
-		}
-	}()
-
-	var beat core.Beat
-	err = tx.QueryRowContext(ctx, stmt, id).Scan(
-		&beat.ID,
-		&beat.BeatmakerID,
-		&beat.FilePath,
-		&beat.ImagePath,
-		&beat.Name,
-		&beat.Bpm,
-		&beat.Description,
-		&beat.IsFileDownloaded,
-		&beat.IsImageDownloaded,
-		&beat.IsDeleted,
-		&beat.CreatedAt,
-		&beat.UpdatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, core.ErrBeatNotFound
-		}
-		return nil, err
-	}
-
-	beatParams, err := getFullBeatByID(ctx, tx, beat)
-	if err != nil {
-		return nil, err
-	}
-
-	return beatParams, nil
-}
-
-func (s *store) GetBeatByID(ctx context.Context, beatID int, param core.IsDownloaded) (*core.Beat, error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	var beat core.Beat
-
-	isDownloaded := []bool{true}
-	if param == core.False {
-		isDownloaded = []bool{false}
-	} else if param == core.Any {
-		isDownloaded = append(isDownloaded, false)
-	}
-
-	stmt := `SELECT id, beatmaker_id, file_path, image_path, name,description,
-	is_file_downloaded, is_image_downloaded, is_deleted, created_at, updated_at
-	FROM beats
-	WHERE id = $1
-	AND is_file_downloaded = ANY($2::boolean[])
-	AND is_image_downloaded = ANY($2::boolean[])
-	AND is_deleted = false`
-	err := s.DB.QueryRowContext(ctx, stmt, beatID, isDownloaded).Scan(
-		&beat.ID,
-		&beat.BeatmakerID,
-		&beat.FilePath,
-		&beat.ImagePath,
-		&beat.Name,
-		&beat.Description,
-		&beat.IsFileDownloaded,
-		&beat.IsImageDownloaded,
-		&beat.IsDeleted,
-		&beat.CreatedAt,
-		&beat.UpdatedAt)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, core.ErrBeatNotFound
-		}
-		return nil, err
-	}
-
-	return &beat, nil
-}
-
-func (s *store) GetBeatFromS3(ctx context.Context, beatPath string, start int, end *int) (obj io.ReadCloser, size int, contentType string, err error) {
-	objInfo, err := s.Minio.Client.StatObject(ctx, s.bucketName, beatPath, miniolib.StatObjectOptions{})
-	if err != nil {
-		return nil, 0, "", err
-	}
-
-	size = int(objInfo.Size)
-
-	if start >= size || start < 0 {
-		return nil, 0, "", core.ErrInvalidRange
-	}
-
-	if *end >= size || start > 0 && *end == -1 {
-		*end = size - 1
-	}
-
-	var opts miniolib.GetObjectOptions
-	if start != 0 || *end != -1 {
-		if err := opts.SetRange(int64(start), int64(*end)); err != nil {
-			return nil, 0, "", err
-		}
-	}
-
-	obj, err = s.Minio.Client.GetObject(ctx, s.bucketName, beatPath, opts)
-	if err != nil {
-		return nil, 0, "", err
-	}
-
-	return obj, size, objInfo.ContentType, nil
-}
-
-func insertTx(ctx context.Context, stmt string, beatID int, elems []int, tx *sql.Tx) error {
-	var args []any
-	cur := 1
-	for _, elem := range elems {
-		stmt += fmt.Sprintf(" ($%d, $%d),", cur, cur+1)
-		args = append(args, beatID, elem)
-		cur += 2
-	}
-	stmt = strings.TrimSuffix(stmt, ",")
-
-	_, err := tx.ExecContext(ctx, stmt, args...)
-	if err != nil {
+	if err = qtx.SaveBeat(ctx, beat.SaveBeatParams); err != nil {
 		logger.Log().Error(ctx, err.Error())
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation {
-			return core.ErrInvalidFilters
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return model.ErrBeatAlreadyExists
 		}
 		return err
 	}
 
-	return nil
-}
-
-func (s *store) AddBeat(ctx context.Context, beat core.BeatParams) (beatID int, err error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	tx, err := s.DB.Begin()
-	if err != nil {
-		return 0, err
-	}
-
-	defer func() {
-		if err != nil {
-			tx.Rollback() // nolint
-		} else {
-			tx.Commit() // nolint
-		}
-	}()
-
-	stmt := `INSERT INTO beats (id, beatmaker_id, file_path, image_path, name, description, bpm)
-	VALUES ($1, $2, $3, $4, $5, $6, $7)
-	RETURNING id`
-	err = tx.QueryRowContext(
-		ctx,
-		stmt,
-		beat.Beat.ID,
-		beat.Beat.BeatmakerID,
-		beat.Beat.FilePath,
-		beat.Beat.ImagePath,
-		beat.Beat.Name,
-		beat.Beat.Description,
-		beat.Beat.Bpm).Scan(&beatID)
-	if err != nil {
-		logger.Log().Debug(ctx, err.Error())
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-			return 0, core.ErrBeatExists
-		}
-		return 0, err
-	}
-
-	var genres []int
-	for _, genre := range beat.Genres {
-		genres = append(genres, genre.GenreID)
-	}
-	if err := insertTx(ctx, `INSERT INTO beats_genres (beat_id, genre_id)
-	VALUES`, beatID, genres, tx); err != nil {
-		logger.Log().Error(ctx, err.Error())
-		if errors.Is(err, core.ErrInvalidFilters) {
-			return 0, fmt.Errorf("genre_id: %w", err)
-		}
-		return 0, err
-	}
-
-	var tags []int
-	for _, tag := range beat.Tags {
-		tags = append(tags, tag.TagID)
-	}
-	if err := insertTx(ctx, `INSERT INTO beats_tags (beat_id, tag_id)
-	VALUES`, beatID, tags, tx); err != nil {
-		logger.Log().Error(ctx, err.Error())
-		if errors.Is(err, core.ErrInvalidFilters) {
-			return 0, fmt.Errorf("tag_id: %w", err)
-		}
-		return 0, err
-	}
-
-	var moods []int
-	for _, mood := range beat.Moods {
-		moods = append(moods, mood.MoodID)
-	}
-	if err := insertTx(ctx, `INSERT INTO beats_moods (beat_id, mood_id)
-	VALUES`, beatID, moods, tx); err != nil {
-		logger.Log().Error(ctx, err.Error())
-		if errors.Is(err, core.ErrInvalidFilters) {
-			return 0, fmt.Errorf("mood_id: %w", err)
-		}
-		return 0, err
-	}
-
-	_, err = tx.ExecContext(ctx, `INSERT INTO beats_notes (beat_id, note_id, scale)
-	VALUES ($1, $2, $3)`, beat.Note.BeatID, beat.Note.NoteID, beat.Note.Scale)
-	if err != nil {
+	if _, err = qtx.SaveGenres(ctx, beat.Genres); err != nil {
 		logger.Log().Error(ctx, err.Error())
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation {
-			return 0, fmt.Errorf("note_id: %w", core.ErrInvalidFilters)
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return model.ErrInvalidGenreID
 		}
-		return 0, err
-	}
-
-	return beatID, nil
-}
-
-func (s *store) GetPresignedURLPut(ctx context.Context, path string, expiry time.Duration) (url string, err error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	u, err := s.Minio.Client.PresignedPutObject(ctx, s.bucketName, path, expiry)
-	if err != nil {
-		return "", err
-	}
-
-	return u.String(), nil
-}
-
-func (s *store) GetPresignedURLGet(ctx context.Context, path string, expiry time.Duration) (url string, err error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	u, err := s.Minio.Client.PresignedGetObject(ctx, s.bucketName, path, expiry, nil)
-	if err != nil {
-		return "", err
-	}
-
-	return u.String(), nil
-}
-
-func (s *store) GetBeatByFilter(ctx context.Context, filter core.FeedFilter, seen []string) (*core.BeatParams, error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	var clause string
-	var args []any
-	args = append(args, seen)
-	cur := 2
-	if filter.Genres != nil {
-		clause += fmt.Sprintf("AND bg.genre_id IN (SELECT UNNEST($%d::int[]))\n", cur)
-		args = append(args, filter.Genres)
-		cur++
-	}
-	if filter.Tags != nil {
-		clause += fmt.Sprintf("AND bt.tag_id IN (SELECT UNNEST($%d::int[]))\n", cur)
-		args = append(args, filter.Tags)
-		cur++
-	}
-	if filter.Moods != nil {
-		clause += fmt.Sprintf("AND bm.mood_id IN (SELECT UNNEST($%d::int[]))\n", cur)
-		args = append(args, filter.Moods)
-		cur++
-	}
-	if filter.Note != nil {
-		clause += fmt.Sprintf("AND bn.note_id = $%d AND bn.scale = $%d\n", cur, cur+1)
-		args = append(args, filter.Note.NoteID, filter.Note.Scale)
-		cur += 2
-	}
-	if filter.Bpm != nil {
-		clause += fmt.Sprintf("AND b.bpm BETWEEN ($%d-15) AND ($%d+15)\n", cur, cur)
-		args = append(args, filter.Bpm)
-	}
-
-	stmt := `WITH a AS (
-			SELECT bg.beat_id, b.beatmaker_id, b.image_path, b.bpm, b.name, b.description, bn.note_id, bn.scale, b.created_at, b.updated_at
-			FROM beats b
-			JOIN beats_genres bg ON b.id = bg.beat_id
-			JOIN beats_tags bt ON b.id = bt.beat_id
-			JOIN beats_moods bm ON b.id = bm.beat_id
-			JOIN beats_notes bn ON b.id = bn.beat_id
-			WHERE bg.beat_id NOT IN (SELECT UNNEST($1::int[]))`
-	stmt += "\n" + clause + `AND b.is_file_downloaded = true
-			AND b.is_image_downloaded = true
-			AND b.is_deleted = false
-		), b as (
-			SELECT * FROM a
-			OFFSET FLOOR(random() * (SELECT COUNT(*) FROM a))
-		)
-
-		SELECT beat_id, beatmaker_id, image_path, name, description, note_id, scale, bpm, created_at, updated_at
-		FROM b LIMIT 1`
-
-	tx, err := s.DB.Begin()
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		if err != nil {
-			tx.Rollback() // nolint
-		} else {
-			tx.Commit() // nolint
-		}
-	}()
-
-	var note core.BeatNote
-	var beat core.Beat
-	err = tx.QueryRowContext(
-		ctx,
-		stmt,
-		args...).Scan(
-		&beat.ID,
-		&beat.BeatmakerID,
-		&beat.ImagePath,
-		&beat.Name,
-		&beat.Description,
-		&note.NoteID,
-		&note.Scale,
-		&beat.Bpm,
-		&beat.CreatedAt,
-		&beat.UpdatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, core.ErrBeatNotFound
-		}
-		return nil, err
-	}
-
-	beatParams, err := getFullBeatByID(ctx, tx, beat)
-	if err != nil {
-		return nil, err
-	}
-
-	return beatParams, nil
-}
-
-func (s *store) GetUserSeenBeats(ctx context.Context, userID int) ([]string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	res, err := s.Redis.Client.LRange(ctx, fmt.Sprintf("%d", userID), 0, -1).Result()
-	if err != nil {
-		return nil, err
-	}
-
-	return res, nil
-}
-
-func (s *store) ReplaceUserSeenBeat(ctx context.Context, userID, beatID int) error {
-	key := fmt.Sprintf("%d", userID)
-
-	for range redisRetries {
-		err := s.Redis.Client.Watch(ctx, func(tx *redislib.Tx) error {
-			cnt, err := tx.LLen(ctx, key).Result()
-			if err != nil {
-				return err
-			}
-
-			_, err = tx.TxPipelined(ctx, func(pipe redislib.Pipeliner) error {
-				if cnt >= int64(s.userHistory) {
-					if _, err = pipe.RPop(ctx, key).Result(); err != nil {
-						return err
-					}
-				}
-
-				if _, err = pipe.LPush(ctx, key, beatID).Result(); err != nil {
-					return err
-				}
-
-				return nil
-			})
-			return err
-		}, key)
-		if !errors.Is(err, redislib.TxFailedErr) {
-			return err
-		}
-	}
-
-	return core.ErrAmountOfRetriesExceeded
-}
-
-func (s *store) ClearUserSeenBeats(ctx context.Context, userID int) error {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	if _, err := s.Redis.Client.Del(ctx, fmt.Sprintf("%d", userID)).Result(); err != nil {
 		return err
 	}
 
-	return nil
+	if _, err = qtx.SaveTags(ctx, beat.Tags); err != nil {
+		logger.Log().Error(ctx, err.Error())
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return model.ErrInvalidTagID
+		}
+		return err
+	}
+
+	if _, err = qtx.SaveMoods(ctx, beat.Moods); err != nil {
+		logger.Log().Error(ctx, err.Error())
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return model.ErrInvalidMoodID
+		}
+		return err
+	}
+
+	if err = qtx.SaveNote(ctx, beat.Note); err != nil {
+		logger.Log().Error(ctx, err.Error())
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return model.ErrInvalidNoteID
+		}
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
-func (s *store) GetBeatsByBeatmakerID(ctx context.Context, beatmakerID int, p core.GetBeatsParams) (beats []core.BeatParams, total int, err error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	tx, err := s.DB.Begin()
+func (s *BeatStore) GetBeatByID(ctx context.Context, id int) (*model.Beat, error) {
+	beat, err := s.queries.GetBeatByID(ctx, int32(id))
 	if err != nil {
-		return nil, 0, err
-	}
-
-	defer func() {
-		if err != nil {
-			tx.Rollback() // nolint
-		} else {
-			tx.Commit() // nolint
+		logger.Log().Error(ctx, err.Error())
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, model.ErrBeatNotFound
 		}
-	}()
+	}
 
-	stmt := `SELECT COUNT(*)
-	FROM beats
-	WHERE beatmaker_id = $1
-	AND is_file_downloaded = true
-	AND is_image_downloaded = true
-	AND is_deleted = false`
+	return &model.Beat{Beat: beat}, nil
+}
 
-	err = s.DB.QueryRowContext(ctx, stmt, beatmakerID).Scan(&total)
+func (s *BeatStore) GetSaveFileURL(ctx context.Context, path string) (*string, error) {
+	expiry := time.Second * 60 * 60 * 24
+
+	url, err := s.Minio.Client.PresignedPutObject(ctx, s.bucketName, path, expiry)
 	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, err
+	}
+
+	u := url.String()
+	return &u, nil
+}
+
+func (s *BeatStore) GetDownloadFileURL(ctx context.Context, path string) (*string, error) {
+	expiry := time.Second * 60 * 60 * 24
+
+	url, err := s.Minio.Client.PresignedGetObject(ctx, s.bucketName, path, expiry, nil)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, err
+	}
+
+	u := url.String()
+	return &u, nil
+}
+
+func (s *BeatStore) GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total int, err error) {
+	builder := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+
+	query := builder.Select(
+		"b.id",
+		"b.beatmaker_id",
+		"b.file_path",
+		"b.image_path",
+		"b.name",
+		"b.description",
+		"b.is_file_downloaded",
+		"b.is_image_downloaded",
+		"b.bpm",
+		"b.created_at",
+		"array_agg(distinct g.name) as genres",
+		"array_agg(distinct t.name) as tags",
+		"array_agg(distinct m.name) as moods",
+		"array_agg(distinct n.name) note_name",
+		"array_agg(distinct bn.scale) note_scale",
+	).Distinct().From("beats b").
+		LeftJoin("beats_genres bg on b.id = bg.beat_id").
+		LeftJoin("beats_tags bt on b.id = bt.beat_id").
+		LeftJoin("beats_moods bm on b.id = bm.beat_id").
+		LeftJoin("beats_notes bn on b.id = bn.beat_id").
+		LeftJoin("genres g on bg.genre_id = g.id").
+		LeftJoin("tags t on bt.tag_id = t.id").
+		LeftJoin("moods m on bm.mood_id = m.id").
+		LeftJoin("notes n on bn.note_id = n.id").
+		Where("b.is_deleted = false").
+		GroupBy("b.id")
+
+	if params.BeatID != nil {
+		query = query.Where("id = ?", *params.BeatID)
+	}
+	if params.BeatmakerID != nil {
+		query = query.Where("beatmaker_id = ?", *params.BeatmakerID)
+	}
+	if params.BeatName != nil {
+		query = query.Where("name = ?", *params.BeatName)
+	}
+	if params.Bpm != nil {
+		query = query.Where("bpm between (?-15) and (?+15)", *params.Bpm, *params.Bpm)
+	}
+	if params.IsDownloaded != nil {
+		if *params.IsDownloaded {
+			query = query.Where("is_file_downloaded = ? and is_image_downloaded = ?", params.IsDownloaded, params.IsDownloaded)
+		} else {
+			query = query.Where("is_file_downloaded = ? or is_image_downloaded = ?", params.IsDownloaded, params.IsDownloaded)
+		}
+	}
+	if params.Genre != nil {
+		query = query.Where("genre in (?)", params.Genre)
+	}
+	if params.Tag != nil {
+		query = query.Where("tag in (?)", params.Tag)
+	}
+	if params.Mood != nil {
+		query = query.Where("mood in (?)", params.Mood)
+	}
+	if params.Note != nil {
+		query = query.Where("note_name = ? and note_scale = ?", params.Note.Name, params.Note.Scale)
+	}
+
+	count := builder.Select("count(distinct composite_beats.id)").FromSelect(query, "composite_beats")
+	sql, args, err := count.ToSql()
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
 		return nil, 0, err
 	}
 
-	stmt = fmt.Sprintf(
-		`SELECT id, beatmaker_id, file_path, image_path, name, bpm, description,
-	is_file_downloaded, is_image_downloaded, is_deleted, created_at, updated_at
-	FROM beats
-	WHERE beatmaker_id = $1
-	AND is_deleted = false
-	AND is_file_downloaded = true
-	AND is_image_downloaded = true
-	ORDER BY updated_at %s
-	OFFSET $2
-	LIMIT $3`, p.Order)
-
-	rows, err := s.DB.QueryContext(ctx, stmt, beatmakerID, p.Offset, p.Limit)
-	if err != nil {
+	if err = s.DB.QueryRow(ctx, sql, args...).Scan(&total); err != nil {
+		logger.Log().Error(ctx, err.Error())
 		return nil, 0, err
 	}
+
+	if params.OrderBy != nil {
+		query = query.OrderBy(fmt.Sprintf("%q %s", params.OrderBy.Field, params.OrderBy.Order))
+	}
+	query = query.Limit(uint64(params.Limit))
+	if params.Offset != nil {
+		query = query.Offset(uint64(*params.Offset))
+	}
+
+	sql, args, err = query.ToSql()
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, 0, err
+	}
+
+	logger.Log().Debug(ctx, sql)
+
+	rows, err := s.DB.Query(ctx, sql, args...)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "42703" {
+			return nil, 0, model.ErrOrderByInvalidField
+		}
+		return nil, 0, err
+	}
+	defer rows.Close()
 
 	for rows.Next() {
-		var beat core.Beat
-		if err := rows.Scan(
+		var beat model.Beat
+		var genres, tags, moods, noteNames, noteScales []*string
+		if err = rows.Scan(
 			&beat.ID,
 			&beat.BeatmakerID,
 			&beat.FilePath,
 			&beat.ImagePath,
 			&beat.Name,
-			&beat.Bpm,
 			&beat.Description,
 			&beat.IsFileDownloaded,
 			&beat.IsImageDownloaded,
-			&beat.IsDeleted,
+			&beat.Bpm,
 			&beat.CreatedAt,
-			&beat.UpdatedAt); err != nil {
+			&genres,
+			&tags,
+			&moods,
+			&noteNames,
+			&noteScales,
+		); err != nil {
+			logger.Log().Error(ctx, err.Error())
 			return nil, 0, err
 		}
 
-		beatParams, err := getFullBeatByID(ctx, tx, beat)
-		if err != nil {
-			return nil, 0, err
+		for _, v := range genres {
+			if v == nil {
+				continue
+			}
+			beat.Genres = append(beat.Genres, model.BeatGenre{Genre: generated.Genre{Name: *v}})
+		}
+		for _, v := range tags {
+			if v == nil {
+				continue
+			}
+			beat.Tags = append(beat.Tags, model.BeatTag{Tag: generated.Tag{Name: *v}})
+		}
+		for _, v := range moods {
+			if v == nil {
+				continue
+			}
+			beat.Moods = append(beat.Moods, model.BeatMood{Mood: generated.Mood{Name: *v}})
+		}
+		if len(noteNames) > 0 && noteNames[0] != nil {
+			beat.Note.Note.Name = *noteNames[0]
+		}
+		if len(noteScales) > 0 && noteScales[0] != nil {
+			beat.Note.Scale = generated.Scale(*noteScales[0])
 		}
 
-		beats = append(beats, *beatParams)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, 0, nil
+		beats = append(beats, beat)
 	}
 
 	return beats, total, nil
 }
 
-func (s *store) GetFilters(ctx context.Context) (*core.Filters, error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	stmt := `SELECT id, name FROM genres`
-	rows, err := s.DB.QueryContext(ctx, stmt)
+func (s *BeatStore) GetBeatParams(ctx context.Context) (params *model.BeatParams, err error) {
+	genres, err := s.queries.GetBeatGenreParams(ctx)
 	if err != nil {
-		return nil, err
-	}
-
-	var genres []core.Genre
-	for rows.Next() {
-		var genre core.Genre
-		if err := rows.Scan(&genre.ID, &genre.Name); err != nil {
-			return nil, err
-		}
-		genres = append(genres, genre)
-	}
-	if err := rows.Err(); err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, err
 	}
 
-	stmt = `SELECT id, name FROM tags`
-	rows, err = s.DB.QueryContext(ctx, stmt)
+	moods, err := s.queries.GetBeatMoodParams(ctx)
 	if err != nil {
-		return nil, err
-	}
-
-	var tags []core.Tag
-	for rows.Next() {
-		var tag core.Tag
-		if err := rows.Scan(&tag.ID, &tag.Name); err != nil {
-			return nil, err
-		}
-		tags = append(tags, tag)
-	}
-	if err := rows.Err(); err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, err
 	}
 
-	stmt = `SELECT id, name FROM moods`
-	rows, err = s.DB.QueryContext(ctx, stmt)
+	tags, err := s.queries.GetBeatTagParams(ctx)
 	if err != nil {
-		return nil, err
-	}
-
-	var moods []core.Mood
-	for rows.Next() {
-		var mood core.Mood
-		if err := rows.Scan(&mood.ID, &mood.Name); err != nil {
-			return nil, err
-		}
-		moods = append(moods, mood)
-	}
-	if err := rows.Err(); err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, err
 	}
 
-	stmt = `SELECT id, name FROM notes`
-	rows, err = s.DB.QueryContext(ctx, stmt)
+	notes, err := s.queries.GetBeatNoteParams(ctx)
 	if err != nil {
-		return nil, err
-	}
-
-	var notes []core.Note
-	for rows.Next() {
-		var note core.Note
-		if err := rows.Scan(&note.ID, &note.Name); err != nil {
-			return nil, err
-		}
-		notes = append(notes, note)
-	}
-	if err := rows.Err(); err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, err
 	}
 
-	return &core.Filters{
+	return &model.BeatParams{
 		Genres: genres,
-		Tags:   tags,
 		Moods:  moods,
-		Note:   notes,
+		Tags:   tags,
+		Notes:  notes,
 	}, nil
+}
+
+func (s *BeatStore) GetBeatBytes(ctx context.Context, path string, start, end *int) (file io.ReadCloser, size *int, contentType *string, err error) {
+	info, err := s.Minio.Client.StatObject(ctx, s.bucketName, path, miniolib.StatObjectOptions{})
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, nil, nil, model.ErrBeatNotFound
+	}
+
+	tmp := int(info.Size)
+	size = &tmp
+
+	if start != nil && *start >= *size {
+		logger.Log().Error(ctx, model.ErrInvalidRangeHeader.Error())
+		return nil, nil, nil, model.ErrInvalidRangeHeader
+	}
+
+	if end != nil && *end >= *size || start != nil && end == nil {
+		end = new(int)
+		*end = int(*size - 1)
+	}
+
+	var opts miniolib.GetObjectOptions
+	if start != nil {
+		if err := opts.SetRange(int64(*start), int64(*end)); err != nil {
+			logger.Log().Error(ctx, err.Error())
+			return nil, nil, nil, err
+		}
+	}
+
+	file, err = s.Minio.Client.GetObject(ctx, s.bucketName, path, opts)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, nil, nil, err
+	}
+
+	return file, size, &info.ContentType, nil
+}
+
+func (s *BeatStore) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeatParams) (*generated.Beat, error) {
+	tx, err := s.DB.Begin(ctx)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, err
+	}
+
+	defer tx.Rollback(ctx)
+
+	qtx := s.queries.WithTx(tx)
+	beat := new(generated.Beat)
+	if *beat, err = qtx.UpdateBeat(ctx, updateBeat.UpdateBeatParams); err != nil {
+		logger.Log().Error(ctx, err.Error())
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, model.ErrBeatNotFound
+		}
+		return nil, err
+	}
+
+	if updateBeat.Genres != nil {
+		if err = qtx.DeleteBeatGenres(ctx, updateBeat.ID); err != nil {
+			logger.Log().Error(ctx, err.Error())
+			return nil, err
+		}
+
+		if _, err = qtx.SaveGenres(ctx, updateBeat.Genres); err != nil {
+			logger.Log().Error(ctx, err.Error())
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+				return nil, model.ErrInvalidGenreID
+			}
+			return nil, err
+		}
+	}
+
+	if updateBeat.Tags != nil {
+		if err = qtx.DeleteBeatTags(ctx, updateBeat.ID); err != nil {
+			logger.Log().Error(ctx, err.Error())
+			return nil, err
+		}
+
+		if _, err = qtx.SaveTags(ctx, updateBeat.Tags); err != nil {
+			logger.Log().Error(ctx, err.Error())
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+				return nil, model.ErrInvalidTagID
+			}
+			return nil, err
+		}
+	}
+
+	if updateBeat.Moods != nil {
+		if err = qtx.DeleteBeatMoods(ctx, updateBeat.ID); err != nil {
+			logger.Log().Error(ctx, err.Error())
+			return nil, err
+		}
+
+		if _, err = qtx.SaveMoods(ctx, updateBeat.Moods); err != nil {
+			logger.Log().Error(ctx, err.Error())
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+				return nil, model.ErrInvalidMoodID
+			}
+			return nil, err
+		}
+	}
+
+	if updateBeat.Note != nil {
+		if err = qtx.DeleteBeatNotes(ctx, updateBeat.ID); err != nil {
+			logger.Log().Error(ctx, err.Error())
+			return nil, err
+		}
+
+		if err = qtx.SaveNote(ctx, *updateBeat.Note); err != nil {
+			logger.Log().Error(ctx, err.Error())
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+				return nil, model.ErrInvalidNoteID
+			}
+			return nil, err
+		}
+	}
+
+	return beat, tx.Commit(ctx)
+}
+
+func (s *BeatStore) DeleteBeat(ctx context.Context, id int) error {
+	if err := s.queries.DeleteBeat(ctx, int32(id)); err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return err
+	}
+
+	return nil
 }

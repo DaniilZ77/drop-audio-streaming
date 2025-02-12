@@ -2,11 +2,11 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const (
@@ -20,7 +20,7 @@ type Postgres struct {
 	connAttempts int
 	connTimeout  time.Duration
 
-	DB *sql.DB
+	DB *pgxpool.Pool
 }
 
 func New(ctx context.Context, dbURL string, opts ...Option) (*Postgres, error) {
@@ -35,14 +35,14 @@ func New(ctx context.Context, dbURL string, opts ...Option) (*Postgres, error) {
 		opt(pg)
 	}
 
-	var db *sql.DB
+	var db *pgxpool.Pool
 	var err error
 
 	for pg.connAttempts > 0 {
-		db, err = sql.Open("pgx", dbURL)
-		if err == nil && db.Ping() == nil {
-			db.SetMaxOpenConns(pg.maxPoolSize)
-			db.SetConnMaxLifetime(time.Hour)
+		db, err = pgxpool.New(ctx, dbURL)
+		if err == nil && db.Ping(ctx) == nil {
+			db.Config().MaxConns = int32(pg.maxPoolSize)
+			db.Config().MaxConnLifetime = time.Hour
 
 			pg.DB = db
 			break
@@ -66,7 +66,5 @@ func New(ctx context.Context, dbURL string, opts ...Option) (*Postgres, error) {
 }
 
 func (p *Postgres) Close(ctx context.Context) {
-	if err := p.DB.Close(); err != nil {
-		logger.Log().Info(ctx, "Error closing database connection: %s", err.Error())
-	}
+	p.DB.Close()
 }

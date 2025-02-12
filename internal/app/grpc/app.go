@@ -7,9 +7,9 @@ import (
 
 	userclient "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/client/user/grpc"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/config"
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
 	audio "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/grpc"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
+	beat "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/service"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"google.golang.org/grpc"
@@ -26,7 +26,7 @@ type App struct {
 func New(
 	ctx context.Context,
 	cfg *config.Config,
-	beatService core.BeatService,
+	beatService *beat.BeatService,
 	grpcUserClient *userclient.Client,
 ) *App {
 	opts := []grpc.ServerOption{}
@@ -64,7 +64,7 @@ func New(
 	gRPCServer := grpc.NewServer(opts...)
 
 	// Register services
-	audio.Register(gRPCServer, beatService, grpcUserClient)
+	audio.Register(gRPCServer, beatService, beatService)
 
 	return &App{
 		gRPCServer: gRPCServer,

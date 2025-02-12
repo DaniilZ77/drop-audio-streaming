@@ -19,177 +19,253 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AudioService_Upload_FullMethodName     = "/audio.AudioService/Upload"
-	AudioService_GetBeat_FullMethodName    = "/audio.AudioService/GetBeat"
-	AudioService_GetFilters_FullMethodName = "/audio.AudioService/GetFilters"
+	BeatService_UploadBeat_FullMethodName    = "/audio.BeatService/UploadBeat"
+	BeatService_GetBeats_FullMethodName      = "/audio.BeatService/GetBeats"
+	BeatService_UpdateBeat_FullMethodName    = "/audio.BeatService/UpdateBeat"
+	BeatService_DeleteBeat_FullMethodName    = "/audio.BeatService/DeleteBeat"
+	BeatService_GetBeatParams_FullMethodName = "/audio.BeatService/GetBeatParams"
 )
 
-// AudioServiceClient is the client API for AudioService service.
+// BeatServiceClient is the client API for BeatService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type AudioServiceClient interface {
-	Upload(ctx context.Context, in *UploadRequest, opts ...grpc.CallOption) (*UploadResponse, error)
-	GetBeat(ctx context.Context, in *GetBeatRequest, opts ...grpc.CallOption) (*GetBeatResponse, error)
-	GetFilters(ctx context.Context, in *GetFiltersRequest, opts ...grpc.CallOption) (*GetFiltersResponse, error)
+type BeatServiceClient interface {
+	UploadBeat(ctx context.Context, in *UploadBeatRequest, opts ...grpc.CallOption) (*UploadBeatResponse, error)
+	GetBeats(ctx context.Context, in *GetBeatsRequest, opts ...grpc.CallOption) (*GetBeatsResponse, error)
+	UpdateBeat(ctx context.Context, in *UpdateBeatRequest, opts ...grpc.CallOption) (*UpdateBeatResponse, error)
+	DeleteBeat(ctx context.Context, in *DeleteBeatRequest, opts ...grpc.CallOption) (*DeleteBeatResponse, error)
+	GetBeatParams(ctx context.Context, in *GetBeatParamsRequest, opts ...grpc.CallOption) (*GetBeatParamsResponse, error)
 }
 
-type audioServiceClient struct {
+type beatServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewAudioServiceClient(cc grpc.ClientConnInterface) AudioServiceClient {
-	return &audioServiceClient{cc}
+func NewBeatServiceClient(cc grpc.ClientConnInterface) BeatServiceClient {
+	return &beatServiceClient{cc}
 }
 
-func (c *audioServiceClient) Upload(ctx context.Context, in *UploadRequest, opts ...grpc.CallOption) (*UploadResponse, error) {
+func (c *beatServiceClient) UploadBeat(ctx context.Context, in *UploadBeatRequest, opts ...grpc.CallOption) (*UploadBeatResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UploadResponse)
-	err := c.cc.Invoke(ctx, AudioService_Upload_FullMethodName, in, out, cOpts...)
+	out := new(UploadBeatResponse)
+	err := c.cc.Invoke(ctx, BeatService_UploadBeat_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *audioServiceClient) GetBeat(ctx context.Context, in *GetBeatRequest, opts ...grpc.CallOption) (*GetBeatResponse, error) {
+func (c *beatServiceClient) GetBeats(ctx context.Context, in *GetBeatsRequest, opts ...grpc.CallOption) (*GetBeatsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetBeatResponse)
-	err := c.cc.Invoke(ctx, AudioService_GetBeat_FullMethodName, in, out, cOpts...)
+	out := new(GetBeatsResponse)
+	err := c.cc.Invoke(ctx, BeatService_GetBeats_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *audioServiceClient) GetFilters(ctx context.Context, in *GetFiltersRequest, opts ...grpc.CallOption) (*GetFiltersResponse, error) {
+func (c *beatServiceClient) UpdateBeat(ctx context.Context, in *UpdateBeatRequest, opts ...grpc.CallOption) (*UpdateBeatResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetFiltersResponse)
-	err := c.cc.Invoke(ctx, AudioService_GetFilters_FullMethodName, in, out, cOpts...)
+	out := new(UpdateBeatResponse)
+	err := c.cc.Invoke(ctx, BeatService_UpdateBeat_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// AudioServiceServer is the server API for AudioService service.
-// All implementations must embed UnimplementedAudioServiceServer
+func (c *beatServiceClient) DeleteBeat(ctx context.Context, in *DeleteBeatRequest, opts ...grpc.CallOption) (*DeleteBeatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteBeatResponse)
+	err := c.cc.Invoke(ctx, BeatService_DeleteBeat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *beatServiceClient) GetBeatParams(ctx context.Context, in *GetBeatParamsRequest, opts ...grpc.CallOption) (*GetBeatParamsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetBeatParamsResponse)
+	err := c.cc.Invoke(ctx, BeatService_GetBeatParams_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// BeatServiceServer is the server API for BeatService service.
+// All implementations must embed UnimplementedBeatServiceServer
 // for forward compatibility.
-type AudioServiceServer interface {
-	Upload(context.Context, *UploadRequest) (*UploadResponse, error)
-	GetBeat(context.Context, *GetBeatRequest) (*GetBeatResponse, error)
-	GetFilters(context.Context, *GetFiltersRequest) (*GetFiltersResponse, error)
-	mustEmbedUnimplementedAudioServiceServer()
+type BeatServiceServer interface {
+	UploadBeat(context.Context, *UploadBeatRequest) (*UploadBeatResponse, error)
+	GetBeats(context.Context, *GetBeatsRequest) (*GetBeatsResponse, error)
+	UpdateBeat(context.Context, *UpdateBeatRequest) (*UpdateBeatResponse, error)
+	DeleteBeat(context.Context, *DeleteBeatRequest) (*DeleteBeatResponse, error)
+	GetBeatParams(context.Context, *GetBeatParamsRequest) (*GetBeatParamsResponse, error)
+	mustEmbedUnimplementedBeatServiceServer()
 }
 
-// UnimplementedAudioServiceServer must be embedded to have
+// UnimplementedBeatServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedAudioServiceServer struct{}
+type UnimplementedBeatServiceServer struct{}
 
-func (UnimplementedAudioServiceServer) Upload(context.Context, *UploadRequest) (*UploadResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Upload not implemented")
+func (UnimplementedBeatServiceServer) UploadBeat(context.Context, *UploadBeatRequest) (*UploadBeatResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UploadBeat not implemented")
 }
-func (UnimplementedAudioServiceServer) GetBeat(context.Context, *GetBeatRequest) (*GetBeatResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBeat not implemented")
+func (UnimplementedBeatServiceServer) GetBeats(context.Context, *GetBeatsRequest) (*GetBeatsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBeats not implemented")
 }
-func (UnimplementedAudioServiceServer) GetFilters(context.Context, *GetFiltersRequest) (*GetFiltersResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetFilters not implemented")
+func (UnimplementedBeatServiceServer) UpdateBeat(context.Context, *UpdateBeatRequest) (*UpdateBeatResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateBeat not implemented")
 }
-func (UnimplementedAudioServiceServer) mustEmbedUnimplementedAudioServiceServer() {}
-func (UnimplementedAudioServiceServer) testEmbeddedByValue()                      {}
+func (UnimplementedBeatServiceServer) DeleteBeat(context.Context, *DeleteBeatRequest) (*DeleteBeatResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteBeat not implemented")
+}
+func (UnimplementedBeatServiceServer) GetBeatParams(context.Context, *GetBeatParamsRequest) (*GetBeatParamsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBeatParams not implemented")
+}
+func (UnimplementedBeatServiceServer) mustEmbedUnimplementedBeatServiceServer() {}
+func (UnimplementedBeatServiceServer) testEmbeddedByValue()                     {}
 
-// UnsafeAudioServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to AudioServiceServer will
+// UnsafeBeatServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to BeatServiceServer will
 // result in compilation errors.
-type UnsafeAudioServiceServer interface {
-	mustEmbedUnimplementedAudioServiceServer()
+type UnsafeBeatServiceServer interface {
+	mustEmbedUnimplementedBeatServiceServer()
 }
 
-func RegisterAudioServiceServer(s grpc.ServiceRegistrar, srv AudioServiceServer) {
-	// If the following call pancis, it indicates UnimplementedAudioServiceServer was
+func RegisterBeatServiceServer(s grpc.ServiceRegistrar, srv BeatServiceServer) {
+	// If the following call pancis, it indicates UnimplementedBeatServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&AudioService_ServiceDesc, srv)
+	s.RegisterService(&BeatService_ServiceDesc, srv)
 }
 
-func _AudioService_Upload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UploadRequest)
+func _BeatService_UploadBeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UploadBeatRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AudioServiceServer).Upload(ctx, in)
+		return srv.(BeatServiceServer).UploadBeat(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AudioService_Upload_FullMethodName,
+		FullMethod: BeatService_UploadBeat_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AudioServiceServer).Upload(ctx, req.(*UploadRequest))
+		return srv.(BeatServiceServer).UploadBeat(ctx, req.(*UploadBeatRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AudioService_GetBeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetBeatRequest)
+func _BeatService_GetBeats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBeatsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AudioServiceServer).GetBeat(ctx, in)
+		return srv.(BeatServiceServer).GetBeats(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AudioService_GetBeat_FullMethodName,
+		FullMethod: BeatService_GetBeats_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AudioServiceServer).GetBeat(ctx, req.(*GetBeatRequest))
+		return srv.(BeatServiceServer).GetBeats(ctx, req.(*GetBeatsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AudioService_GetFilters_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetFiltersRequest)
+func _BeatService_UpdateBeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateBeatRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AudioServiceServer).GetFilters(ctx, in)
+		return srv.(BeatServiceServer).UpdateBeat(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AudioService_GetFilters_FullMethodName,
+		FullMethod: BeatService_UpdateBeat_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AudioServiceServer).GetFilters(ctx, req.(*GetFiltersRequest))
+		return srv.(BeatServiceServer).UpdateBeat(ctx, req.(*UpdateBeatRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// AudioService_ServiceDesc is the grpc.ServiceDesc for AudioService service.
+func _BeatService_DeleteBeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteBeatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BeatServiceServer).DeleteBeat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BeatService_DeleteBeat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BeatServiceServer).DeleteBeat(ctx, req.(*DeleteBeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BeatService_GetBeatParams_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBeatParamsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BeatServiceServer).GetBeatParams(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BeatService_GetBeatParams_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BeatServiceServer).GetBeatParams(ctx, req.(*GetBeatParamsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// BeatService_ServiceDesc is the grpc.ServiceDesc for BeatService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var AudioService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "audio.AudioService",
-	HandlerType: (*AudioServiceServer)(nil),
+var BeatService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "audio.BeatService",
+	HandlerType: (*BeatServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Upload",
-			Handler:    _AudioService_Upload_Handler,
+			MethodName: "UploadBeat",
+			Handler:    _BeatService_UploadBeat_Handler,
 		},
 		{
-			MethodName: "GetBeat",
-			Handler:    _AudioService_GetBeat_Handler,
+			MethodName: "GetBeats",
+			Handler:    _BeatService_GetBeats_Handler,
 		},
 		{
-			MethodName: "GetFilters",
-			Handler:    _AudioService_GetFilters_Handler,
+			MethodName: "UpdateBeat",
+			Handler:    _BeatService_UpdateBeat_Handler,
+		},
+		{
+			MethodName: "DeleteBeat",
+			Handler:    _BeatService_DeleteBeat_Handler,
+		},
+		{
+			MethodName: "GetBeatParams",
+			Handler:    _BeatService_GetBeatParams_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
