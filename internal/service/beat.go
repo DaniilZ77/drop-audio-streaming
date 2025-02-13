@@ -18,8 +18,8 @@ type BeatModifier interface {
 }
 
 type BeatProvider interface {
-	GetBeatByID(ctx context.Context, id int) (*model.Beat, error)
-	GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total int, err error)
+	GetBeatByID(ctx context.Context, id int) (*generated.Beat, error)
+	GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total *int, err error)
 	GetBeatParams(ctx context.Context) (params *model.BeatParams, err error)
 }
 
@@ -143,18 +143,18 @@ func (s *BeatService) SaveBeat(ctx context.Context, beat model.SaveBeatParams) (
 	return
 }
 
-func (s *BeatService) GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total int, err error) {
+func (s *BeatService) GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total *int, err error) {
 	beats, total, err = s.beatProvider.GetBeats(ctx, params)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		return nil, 0, err
+		return nil, nil, err
 	}
 
 	for i, v := range beats {
 		url, err := s.urlProvider.GetDownloadFileURL(ctx, v.ImagePath)
 		if err != nil {
 			logger.Log().Error(ctx, err.Error())
-			return nil, 0, err
+			return nil, nil, err
 		}
 
 		beats[i].ImagePath = *url

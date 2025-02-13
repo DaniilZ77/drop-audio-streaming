@@ -16,13 +16,14 @@ import (
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/postgres"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
 	sq "github.com/Masterminds/squirrel"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type BeatStore struct {
 	*minio.Minio
 	*postgres.Postgres
-	queries    *generated.Queries
+	*generated.Queries
 	bucketName string
 }
 
@@ -42,7 +43,7 @@ func (s *BeatStore) SaveBeat(ctx context.Context, beat model.SaveBeatParams) (er
 
 	defer tx.Rollback(ctx)
 
-	qtx := s.queries.WithTx(tx)
+	qtx := s.Queries.WithTx(tx)
 
 	if err = qtx.SaveBeat(ctx, beat.SaveBeatParams); err != nil {
 		logger.Log().Error(ctx, err.Error())
@@ -92,8 +93,8 @@ func (s *BeatStore) SaveBeat(ctx context.Context, beat model.SaveBeatParams) (er
 	return tx.Commit(ctx)
 }
 
-func (s *BeatStore) GetBeatByID(ctx context.Context, id int) (*model.Beat, error) {
-	beat, err := s.queries.GetBeatByID(ctx, int32(id))
+func (s *BeatStore) GetBeatByID(ctx context.Context, id int) (*generated.Beat, error) {
+	beat, err := s.Queries.GetBeatByID(ctx, int32(id))
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, sql.ErrNoRows) {
@@ -101,7 +102,7 @@ func (s *BeatStore) GetBeatByID(ctx context.Context, id int) (*model.Beat, error
 		}
 	}
 
-	return &model.Beat{Beat: beat}, nil
+	return &beat, nil
 }
 
 func (s *BeatStore) GetSaveFileURL(ctx context.Context, path string) (*string, error) {
@@ -130,7 +131,7 @@ func (s *BeatStore) GetDownloadFileURL(ctx context.Context, path string) (*strin
 	return &u, nil
 }
 
-func (s *BeatStore) GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total int, err error) {
+func (s *BeatStore) GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total *int, err error) {
 	builder := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
 	query := builder.Select(
@@ -144,11 +145,11 @@ func (s *BeatStore) GetBeats(ctx context.Context, params model.GetBeatsParams) (
 		"b.is_image_downloaded",
 		"b.bpm",
 		"b.created_at",
-		"array_agg(distinct g.name) as genres",
-		"array_agg(distinct t.name) as tags",
-		"array_agg(distinct m.name) as moods",
-		"array_agg(distinct n.name) note_name",
-		"array_agg(distinct bn.scale) note_scale",
+		"array_agg(distinct g.name) filter (where g.name is not null) as genres",
+		"array_agg(distinct t.name) filter (where t.name is not null) as tags",
+		"array_agg(distinct m.name) filter (where m.name is not null) as moods",
+		"n.name note_name",
+		"bn.scale note_scale",
 	).Distinct().From("beats b").
 		LeftJoin("beats_genres bg on b.id = bg.beat_id").
 		LeftJoin("beats_tags bt on b.id = bt.beat_id").
@@ -159,7 +160,7 @@ func (s *BeatStore) GetBeats(ctx context.Context, params model.GetBeatsParams) (
 		LeftJoin("moods m on bm.mood_id = m.id").
 		LeftJoin("notes n on bn.note_id = n.id").
 		Where("b.is_deleted = false").
-		GroupBy("b.id")
+		GroupBy("b.id", "n.name", "bn.scale")
 
 	if params.BeatID != nil {
 		query = query.Where("id = ?", *params.BeatID)
@@ -193,120 +194,71 @@ func (s *BeatStore) GetBeats(ctx context.Context, params model.GetBeatsParams) (
 		query = query.Where("note_name = ? and note_scale = ?", params.Note.Name, params.Note.Scale)
 	}
 
-	count := builder.Select("count(distinct composite_beats.id)").FromSelect(query, "composite_beats")
+	count := builder.Select("count(distinct b.id)").FromSelect(query, "b")
 	sql, args, err := count.ToSql()
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		return nil, 0, err
+		return nil, nil, err
 	}
+
+	logger.Log().Debug(ctx, sql)
 
 	if err = s.DB.QueryRow(ctx, sql, args...).Scan(&total); err != nil {
 		logger.Log().Error(ctx, err.Error())
-		return nil, 0, err
+		return nil, nil, err
 	}
 
 	if params.OrderBy != nil {
 		query = query.OrderBy(fmt.Sprintf("%q %s", params.OrderBy.Field, params.OrderBy.Order))
 	}
-	query = query.Limit(uint64(params.Limit))
-	if params.Offset != nil {
-		query = query.Offset(uint64(*params.Offset))
-	}
+	query = query.Limit(uint64(params.Limit)).Offset(uint64(params.Offset))
 
 	sql, args, err = query.ToSql()
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		return nil, 0, err
+		return nil, nil, err
 	}
-
-	logger.Log().Debug(ctx, sql)
 
 	rows, err := s.DB.Query(ctx, sql, args...)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "42703" {
-			return nil, 0, model.ErrOrderByInvalidField
+			return nil, nil, model.ErrOrderByInvalidField
 		}
-		return nil, 0, err
+		return nil, nil, err
 	}
 	defer rows.Close()
 
-	for rows.Next() {
-		var beat model.Beat
-		var genres, tags, moods, noteNames, noteScales []*string
-		if err = rows.Scan(
-			&beat.ID,
-			&beat.BeatmakerID,
-			&beat.FilePath,
-			&beat.ImagePath,
-			&beat.Name,
-			&beat.Description,
-			&beat.IsFileDownloaded,
-			&beat.IsImageDownloaded,
-			&beat.Bpm,
-			&beat.CreatedAt,
-			&genres,
-			&tags,
-			&moods,
-			&noteNames,
-			&noteScales,
-		); err != nil {
-			logger.Log().Error(ctx, err.Error())
-			return nil, 0, err
-		}
-
-		for _, v := range genres {
-			if v == nil {
-				continue
-			}
-			beat.Genres = append(beat.Genres, model.BeatGenre{Genre: generated.Genre{Name: *v}})
-		}
-		for _, v := range tags {
-			if v == nil {
-				continue
-			}
-			beat.Tags = append(beat.Tags, model.BeatTag{Tag: generated.Tag{Name: *v}})
-		}
-		for _, v := range moods {
-			if v == nil {
-				continue
-			}
-			beat.Moods = append(beat.Moods, model.BeatMood{Mood: generated.Mood{Name: *v}})
-		}
-		if len(noteNames) > 0 && noteNames[0] != nil {
-			beat.Note.Note.Name = *noteNames[0]
-		}
-		if len(noteScales) > 0 && noteScales[0] != nil {
-			beat.Note.Scale = generated.Scale(*noteScales[0])
-		}
-
-		beats = append(beats, beat)
+	beats, err = pgx.CollectRows(rows, pgx.RowToStructByName[model.Beat])
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, nil, err
 	}
 
 	return beats, total, nil
 }
 
 func (s *BeatStore) GetBeatParams(ctx context.Context) (params *model.BeatParams, err error) {
-	genres, err := s.queries.GetBeatGenreParams(ctx)
+	genres, err := s.Queries.GetBeatGenreParams(ctx)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, err
 	}
 
-	moods, err := s.queries.GetBeatMoodParams(ctx)
+	moods, err := s.Queries.GetBeatMoodParams(ctx)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, err
 	}
 
-	tags, err := s.queries.GetBeatTagParams(ctx)
+	tags, err := s.Queries.GetBeatTagParams(ctx)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, err
 	}
 
-	notes, err := s.queries.GetBeatNoteParams(ctx)
+	notes, err := s.Queries.GetBeatNoteParams(ctx)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, err
@@ -366,7 +318,7 @@ func (s *BeatStore) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeatP
 
 	defer tx.Rollback(ctx)
 
-	qtx := s.queries.WithTx(tx)
+	qtx := s.Queries.WithTx(tx)
 	beat := new(generated.Beat)
 	if *beat, err = qtx.UpdateBeat(ctx, updateBeat.UpdateBeatParams); err != nil {
 		logger.Log().Error(ctx, err.Error())
@@ -444,7 +396,7 @@ func (s *BeatStore) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeatP
 }
 
 func (s *BeatStore) DeleteBeat(ctx context.Context, id int) error {
-	if err := s.queries.DeleteBeat(ctx, int32(id)); err != nil {
+	if err := s.Queries.DeleteBeat(ctx, int32(id)); err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return err
 	}

@@ -2,40 +2,30 @@ package model
 
 import (
 	"strings"
+	"time"
 
 	audiov1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
-	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type (
 	Beat struct {
-		generated.Beat
-		Genres []BeatGenre
-		Tags   []BeatTag
-		Moods  []BeatMood
-		Note   BeatNote
-	}
-
-	BeatNote struct {
-		generated.BeatsNote
-		Note generated.Note
-	}
-
-	BeatMood struct {
-		generated.BeatsMood
-		Mood generated.Mood
-	}
-
-	BeatTag struct {
-		generated.BeatsTag
-		Tag generated.Tag
-	}
-
-	BeatGenre struct {
-		generated.BeatsGenre
-		Genre generated.Genre
+		ID                int
+		BeatmakerID       int
+		FilePath          string
+		ImagePath         string
+		Name              string
+		Description       string
+		IsFileDownloaded  bool
+		IsImageDownloaded bool
+		Bpm               int
+		CreatedAt         time.Time
+		Genres            []string
+		Tags              []string
+		Moods             []string
+		NoteName          *string
+		NoteScale         *string
 	}
 
 	GetBeatsNote struct {
@@ -59,7 +49,7 @@ type (
 		Bpm          *int
 		OrderBy      *OrderBy
 		Limit        int
-		Offset       *int
+		Offset       int
 		IsDownloaded *bool
 	}
 
@@ -170,16 +160,8 @@ func ToModelGetBeatsParams(params *audiov1.GetBeatsRequest) GetBeatsParams {
 		}
 	}
 
-	if params.Limit != nil {
-		res.Limit = int(*params.Limit)
-	} else {
-		res.Limit = 100
-	}
-
-	if params.Offset != nil {
-		offset := int(*params.Offset)
-		res.Offset = &offset
-	}
+	res.Limit = int(params.Limit)
+	res.Offset = int(params.Offset)
 
 	res.IsDownloaded = params.IsDownloaded
 
@@ -192,43 +174,27 @@ func ToGetBeatsResponse(beats []Beat, total int, params GetBeatsParams) *audiov1
 		res = append(res, toResponseBeat(b))
 	}
 
-	offset := 0
-	if params.Offset != nil {
-		offset = *params.Offset
-	}
-
 	return &audiov1.GetBeatsResponse{
 		Beats: res,
 		Pagination: &audiov1.Pagination{
 			Records:        int64(total),
 			RecordsPerPage: int64(params.Limit),
 			Pages:          (int64(total) + int64(params.Limit) - 1) / int64(params.Limit),
-			CurPage:        int64(offset)/int64(params.Limit) + 1,
+			CurPage:        int64(params.Offset)/int64(params.Limit) + 1,
 		},
 	}
 }
 
 func toResponseBeat(b Beat) *audiov1.Beat {
-	genres := make([]string, 0, len(b.Genres))
-	tags := make([]string, 0, len(b.Tags))
-	moods := make([]string, 0, len(b.Moods))
-
-	for _, v := range b.Genres {
-		genres = append(genres, v.Genre.Name)
-	}
-
-	for _, v := range b.Tags {
-		tags = append(tags, v.Tag.Name)
-	}
-
-	for _, v := range b.Moods {
-		moods = append(moods, v.Mood.Name)
-	}
-
 	scale := audiov1.Scale_MINOR
 	major := strings.ToLower(audiov1.Scale_name[int32(audiov1.Scale_MAJOR)])
-	if b.Note.Scale == generated.Scale(major) {
+	if b.NoteScale != nil && *b.NoteScale == major {
 		scale = audiov1.Scale_MAJOR
+	}
+
+	var name string
+	if b.NoteName != nil {
+		name = *b.NoteName
 	}
 
 	return &audiov1.Beat{
@@ -239,19 +205,19 @@ func toResponseBeat(b Beat) *audiov1.Beat {
 		Image:       b.ImagePath,
 		Name:        b.Name,
 		Description: b.Description,
-		Genre:       genres,
-		Tag:         tags,
-		Mood:        moods,
+		Genre:       b.Genres,
+		Tag:         b.Tags,
+		Mood:        b.Moods,
 		Note: &audiov1.GetBeatsNote{
-			Name:  b.Note.Note.Name,
+			Name:  name,
 			Scale: scale,
 		},
 		Bpm:       int64(b.Bpm),
-		CreatedAt: timestamppb.New(b.CreatedAt.Time),
+		CreatedAt: timestamppb.New(b.CreatedAt),
 	}
 }
 
-func (b BeatParams) ToGetBeatParamsResponse() *audiov1.GetBeatParamsResponse {
+func ToGetBeatParamsResponse(b BeatParams) *audiov1.GetBeatParamsResponse {
 	genres := make([]*audiov1.GenreParam, 0, len(b.Genres))
 	tags := make([]*audiov1.TagParam, 0, len(b.Tags))
 	moods := make([]*audiov1.MoodParam, 0, len(b.Moods))
@@ -328,44 +294,32 @@ func ToModelUpdateBeatParams(req *audiov1.UpdateBeatRequest) UpdateBeatParams {
 		}
 	}
 
-	var name pgtype.Text
+	var name *string
 	if req.Name != nil {
-		name = pgtype.Text{
-			String: *req.Name,
-			Valid:  true,
-		}
+		name = req.Name
 	}
 
-	var description pgtype.Text
+	var description *string
 	if req.Description != nil {
-		description = pgtype.Text{
-			String: *req.Description,
-			Valid:  true,
-		}
+		description = req.Description
 	}
 
-	var bpm pgtype.Int4
+	var bpm *int32
 	if req.Bpm != nil {
-		bpm = pgtype.Int4{
-			Int32: int32(*req.Bpm),
-			Valid: true,
-		}
+		tmp := int32(*req.Bpm)
+		bpm = &tmp
 	}
 
-	var isImageDownloaded pgtype.Bool
+	var isImageDownloaded *bool
 	if req.UpdateImage != nil && *req.UpdateImage {
-		isImageDownloaded = pgtype.Bool{
-			Bool:  false,
-			Valid: true,
-		}
+		tmp := false
+		isImageDownloaded = &tmp
 	}
 
-	var isFileDownloaded pgtype.Bool
+	var isFileDownloaded *bool
 	if req.UpdateFile != nil && *req.UpdateFile {
-		isFileDownloaded = pgtype.Bool{
-			Bool:  false,
-			Valid: true,
-		}
+		tmp := false
+		isFileDownloaded = &tmp
 	}
 
 	return UpdateBeatParams{

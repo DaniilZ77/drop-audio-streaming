@@ -52,18 +52,6 @@ func New(
 	}, nil
 }
 
-func (c *Client) GetUserByID(ctx context.Context, userID int) (*userv1.GetUserResponse, error) {
-	resp, err := c.api.GetUser(ctx, &userv1.GetUserRequest{
-		UserId: int64(userID),
-	})
-	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		return nil, err
-	}
-
-	return resp, nil
-}
-
 func interceptorLogger(l logger.Logger) logging.Logger {
 	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
 		switch lvl {

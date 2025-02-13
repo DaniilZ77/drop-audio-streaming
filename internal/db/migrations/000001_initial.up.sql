@@ -1,5 +1,7 @@
+create extension if not exists "uuid-ossp";
+
 create table if not exists "beats" (
-    "id" integer primary key,
+    "id" serial primary key,
     "beatmaker_id" integer not null,
     "file_path" varchar(64) not null,
     "image_path" varchar(64) not null,
@@ -154,6 +156,7 @@ create table if not exists "beats_notes" (
 );
 
 create index on "beats_notes" ("note_id");
+create unique index on "beats_notes" ("beat_id", "note_id");
 
 create table if not exists "beats_moods" (
     "id" serial primary key,

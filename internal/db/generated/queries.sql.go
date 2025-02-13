@@ -7,8 +7,6 @@ package generated
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const deleteBeat = `-- name: DeleteBeat :exec
@@ -247,11 +245,11 @@ returning id, beatmaker_id, file_path, image_path, name, description, is_file_do
 `
 
 type UpdateBeatParams struct {
-	Name              pgtype.Text
-	Bpm               pgtype.Int4
-	Description       pgtype.Text
-	IsImageDownloaded pgtype.Bool
-	IsFileDownloaded  pgtype.Bool
+	Name              *string
+	Bpm               *int32
+	Description       *string
+	IsImageDownloaded *bool
+	IsFileDownloaded  *bool
 	ID                int32
 }
 

@@ -20,7 +20,7 @@ type BeatModifier interface {
 }
 
 type BeatProvider interface {
-	GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total int, err error)
+	GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total *int, err error)
 	GetBeatParams(ctx context.Context) (params *model.BeatParams, err error)
 }
 
@@ -38,13 +38,13 @@ func Register(
 }
 
 func (s *server) GetBeatParams(ctx context.Context, req *audiov1.GetBeatParamsRequest) (*audiov1.GetBeatParamsResponse, error) {
-	beatParams, err := s.beatProvider.GetBeatParams(ctx)
+	beat, err := s.beatProvider.GetBeatParams(ctx)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return beatParams.ToGetBeatParamsResponse(), nil
+	return model.ToGetBeatParamsResponse(*beat), nil
 }
 
 func (s *server) GetBeats(ctx context.Context, req *audiov1.GetBeatsRequest) (*audiov1.GetBeatsResponse, error) {
@@ -53,8 +53,8 @@ func (s *server) GetBeats(ctx context.Context, req *audiov1.GetBeatsRequest) (*a
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	getBeatsParams := model.ToModelGetBeatsParams(req)
-	beats, total, err := s.beatProvider.GetBeats(ctx, getBeatsParams)
+	params := model.ToModelGetBeatsParams(req)
+	beats, total, err := s.beatProvider.GetBeats(ctx, params)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, model.ErrOrderByInvalidField) {
@@ -63,7 +63,7 @@ func (s *server) GetBeats(ctx context.Context, req *audiov1.GetBeatsRequest) (*a
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return model.ToGetBeatsResponse(beats, total, getBeatsParams), nil
+	return model.ToGetBeatsResponse(beats, *total, params), nil
 }
 
 func (s *server) UploadBeat(ctx context.Context, req *audiov1.UploadBeatRequest) (*audiov1.UploadBeatResponse, error) {
@@ -113,8 +113,8 @@ func (s *server) UpdateBeat(ctx context.Context, req *audiov1.UpdateBeatRequest)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	updateBeatParams := model.ToModelUpdateBeatParams(req)
-	fileUploadURL, imageUploadURL, err := s.beatModifier.UpdateBeat(ctx, updateBeatParams)
+	params := model.ToModelUpdateBeatParams(req)
+	fileUploadURL, imageUploadURL, err := s.beatModifier.UpdateBeat(ctx, params)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, model.ErrInvalidGenreID) ||
