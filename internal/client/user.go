@@ -7,6 +7,7 @@ import (
 
 	userv1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/user"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
+	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 	"google.golang.org/grpc"
@@ -18,7 +19,7 @@ type Client struct {
 	api userv1.UserServiceClient
 }
 
-func New(
+func NewUserClient(
 	ctx context.Context,
 	addr string,
 	timeout time.Duration,
@@ -67,4 +68,14 @@ func interceptorLogger(l logger.Logger) logging.Logger {
 			logger.Log().Fatal(ctx, fmt.Sprintf("unknown level %v", lvl))
 		}
 	})
+}
+
+func (c *Client) GetUser(ctx context.Context, id uuid.UUID) (*userv1.GetUserResponse, error) {
+	user, err := c.api.GetUser(ctx, &userv1.GetUserRequest{UserId: id.String()})
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, err
+	}
+
+	return user, err
 }

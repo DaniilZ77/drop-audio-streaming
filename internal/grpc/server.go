@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	audiov1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio"
+	userv1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/user"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
@@ -30,19 +31,25 @@ type URLProvider interface {
 	GetBeatArchive(ctx context.Context, params generated.SaveOwnerParams) (*string, error)
 }
 
+type UserProvider interface {
+	GetUser(ctx context.Context, id uuid.UUID) (*userv1.GetUserResponse, error)
+}
+
 type server struct {
 	audiov1.UnimplementedBeatServiceServer
 	beatModifier BeatModifier
 	beatProvider BeatProvider
 	urlProvider  URLProvider
+	userProvider UserProvider
 }
 
 func Register(
 	gRPCServer *grpc.Server,
 	beatSaver BeatModifier,
 	beatProvider BeatProvider,
-	urlProvider URLProvider) {
-	audiov1.RegisterBeatServiceServer(gRPCServer, &server{beatModifier: beatSaver, beatProvider: beatProvider, urlProvider: urlProvider})
+	urlProvider URLProvider,
+	userProvider UserProvider) {
+	audiov1.RegisterBeatServiceServer(gRPCServer, &server{beatModifier: beatSaver, beatProvider: beatProvider, urlProvider: urlProvider, userProvider: userProvider})
 }
 
 func (s *server) GetBeatParams(ctx context.Context, req *audiov1.GetBeatParamsRequest) (*audiov1.GetBeatParamsResponse, error) {
@@ -71,7 +78,17 @@ func (s *server) GetBeats(ctx context.Context, req *audiov1.GetBeatsRequest) (*a
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return model.ToGetBeatsResponse(beats, *total, params), nil
+	var users []*userv1.GetUserResponse
+	for i := range beats {
+		user, err := s.userProvider.GetUser(ctx, beats[i].BeatmakerID)
+		if err != nil {
+			logger.Log().Error(ctx, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		users = append(users, user)
+	}
+
+	return model.ToGetBeatsResponse(beats, users, *total, params), nil
 }
 
 func (s *server) UploadBeat(ctx context.Context, req *audiov1.UploadBeatRequest) (*audiov1.UploadBeatResponse, error) {
@@ -161,5 +178,11 @@ func (s *server) AcquireBeat(ctx context.Context, req *audiov1.AcquireBeatReques
 
 	return &audiov1.AcquireBeatResponse{
 		ArchiveDownloadUrl: *url,
+	}, nil
+}
+
+func (s *server) Health(context.Context, *audiov1.HealthRequest) (*audiov1.HealthResponse, error) {
+	return &audiov1.HealthResponse{
+		Message: "OK",
 	}, nil
 }

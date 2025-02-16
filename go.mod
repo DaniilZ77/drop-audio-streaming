@@ -3,7 +3,7 @@ module github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming
 go 1.23.1
 
 require (
-	github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.29
+	github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.32
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/bufbuild/protovalidate-go v0.9.1
 	github.com/docker/go-connections v0.5.0

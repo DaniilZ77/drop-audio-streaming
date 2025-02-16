@@ -10,6 +10,10 @@ github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 h1:L/gRVlceqvL25
 github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.29 h1:R1ep0HgO9jICBFr0GCAurvExXDbz7ranexXggtSo5Qs=
 github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.29/go.mod h1:oRPaAgn5hrwPORhMXVZDmMDZ4vYn7mb08yG5pfAeDTw=
+github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.31 h1:xjszr722OhDkJxRVyM2bL6N3Q/R5jeBUcF9Gug23nZw=
+github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.31/go.mod h1:oRPaAgn5hrwPORhMXVZDmMDZ4vYn7mb08yG5pfAeDTw=
+github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.32 h1:wplElbLLz3Vm16l1RXsL72NE+nRu+koITjfsOilj764=
+github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.32/go.mod h1:oRPaAgn5hrwPORhMXVZDmMDZ4vYn7mb08yG5pfAeDTw=
 github.com/Masterminds/squirrel v1.5.4 h1:uUcX/aBc8O7Fg9kaISIUsHXdKuqehiXAMQTYX8afzqM=
 github.com/Masterminds/squirrel v1.5.4/go.mod h1:NNaOrjSoIDfDA40n7sr2tPNZRfjzjA400rg+riTZj10=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=

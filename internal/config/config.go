@@ -43,7 +43,6 @@ type (
 	}
 
 	Audio struct {
-		ChunkSize        int
 		FileSizeLimit    int64
 		ArchiveSizeLimit int64
 		ImageSizeLimit   int64
@@ -76,9 +75,6 @@ func NewConfig() (*Config, error) {
 	minioBucket := flag.String("minio_bucket", "drop-audio", "minio bucket")
 	minioUseSSL := flag.Bool("minio_use_ssl", false, "minio use ssl")
 	minioLocation := flag.String("minio_location", "us-east-1", "minio location")
-
-	// audio
-	chunkSize := flag.Int("chunk_size", 1024, "chunk size")
 
 	// grpc client
 	grpcClientRetries := flag.Uint("grpc_client_retries", 1, "grpc client retries")
@@ -121,7 +117,6 @@ func NewConfig() (*Config, error) {
 			Key:  *key,
 		},
 		Audio: Audio{
-			ChunkSize:        *chunkSize,
 			FileSizeLimit:    *fileSizeLimit,
 			ArchiveSizeLimit: *archiveSizeLimit,
 			ImageSizeLimit:   *imageSizeLimit,

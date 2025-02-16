@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	userclient "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/client/user/grpc"
+	client "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/client"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/config"
 	audio "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/grpc"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
@@ -27,7 +27,7 @@ func New(
 	ctx context.Context,
 	cfg *config.Config,
 	beatService *beat.BeatService,
-	grpcUserClient *userclient.Client,
+	grpcUserClient *client.Client,
 ) *App {
 	requireAdmin := map[string]bool{
 		"/audio.BeatService/UploadBeat":  true,
@@ -72,7 +72,7 @@ func New(
 	gRPCServer := grpc.NewServer(opts...)
 
 	// Register services
-	audio.Register(gRPCServer, beatService, beatService, beatService)
+	audio.Register(gRPCServer, beatService, beatService, beatService, grpcUserClient)
 
 	return &App{
 		gRPCServer: gRPCServer,

@@ -5,7 +5,7 @@ import (
 
 	grpcapp "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/app/grpc"
 	httpapp "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/app/http"
-	userclient "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/client/user/grpc"
+	client "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/client"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/config"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/minio"
@@ -52,7 +52,7 @@ func New(ctx context.Context, cfg *config.Config) *App {
 	beatService := beat.NewBeatService(beatStore, beatStore, beatStore, beatStore, beatStore, beatServiceConfig)
 
 	// gRPC client
-	gRPCUserClient, err := userclient.New(
+	gRPCUserClient, err := client.NewUserClient(
 		ctx,
 		cfg.GRPCUserClientAddr,
 		cfg.GRPCClientTimeout,

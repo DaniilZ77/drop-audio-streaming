@@ -13,7 +13,7 @@ dario.cat/mergo
 ## explicit; go 1.16
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
-# github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.29
+# github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.32
 ## explicit; go 1.23.1
 github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio
 github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/user

@@ -2,23 +2,33 @@ services:
   backend:
     container_name: drop-audio-streaming
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 1m
+      retries: 2
+      start_period: 30s
+      start_interval: 10s
     build: .
     env_file:
       - .env
     ports:
-      - "50052:50052"
-      - "8083:8081"
+      - 50052:50052
+      - 8081:8081
     networks:
       - drop-audio-streaming
       - drop-shared
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     command: >
       sh -c "./bin/migrator -db_url postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} -migrations_path ${MIGRATIONS_PATH} &&
-      ./bin/drop-audio-streaming -db_url postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} -grpc_port ${GRPC_PORT} -grpc_user_client_addr ${GRPC_USER_CLIENT_ADDR} -http_port ${HTTP_PORT} -redis_password ${REDIS_PASSWORD} -redis_addr ${REDIS_ADDRESS} -cert ${CERT} -key ${KEY} -jwt_secret ${JWT_SECRET} -read_timeout ${READ_TIMEOUT} -log_level ${LOG_LEVEL} -minio_password ${MINIO_PASSWORD} -minio_user ${MINIO_USER} -minio_endpoint ${MINIO_ENDPOINT} -minio_bucket ${MINIO_BUCKET} -minio_use_ssl ${MINIO_USE_SSL} -minio_location ${MINIO_LOCATION} -chunk_size ${CHUNK_SIZE} -upload_url_ttl ${UPLOAD_URL_TTL} -user_history ${USER_HISTORY} -grpc_client_retries ${GRPC_CLIENT_RETRIES} -grpc_client_timeout ${GRPC_CLIENT_TIMEOUT}"
+      ./bin/drop-audio-streaming -db_url postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} -grpc_port ${GRPC_PORT}
+      -grpc_user_client_addr ${GRPC_USER_CLIENT_ADDR} -http_port ${HTTP_PORT} -cert ${CERT} -key ${KEY} -jwt_secret ${JWT_SECRET}
+      -read_timeout ${READ_TIMEOUT} -log_level ${LOG_LEVEL} -minio_password ${MINIO_PASSWORD} -minio_user ${MINIO_USER}
+      -minio_endpoint ${MINIO_ENDPOINT} -minio_bucket ${MINIO_BUCKET} -minio_use_ssl ${MINIO_USE_SSL}
+      -minio_location ${MINIO_LOCATION} -url_ttl ${URL_TTL} -grpc_client_retries ${GRPC_CLIENT_RETRIES} -grpc_client_timeout ${GRPC_CLIENT_TIMEOUT}
+      -file_size_limit ${FILE_SIZE_LIMIT} -image_size_limit ${IMAGE_SIZE_LIMIT} -archive_size_limit ${ARCHIVE_SIZE_LIMIT}"
 
   postgres:
     image: postgres:16.4-alpine
@@ -27,7 +37,7 @@ services:
     env_file:
       - .env
     ports:
-      - "5430:5432"
+      - 5430:5432
     environment:
       POSTGRES_PASSWORD: $POSTGRES_PASSWORD
       POSTGRES_USER: $POSTGRES_USER
@@ -50,11 +60,17 @@ services:
     networks:
       - drop-audio-streaming
     ports:
-      - "8090:8090"
+      - 8090:8090
     volumes:
       - minio-data:/var/lib/minio/data
     env_file:
       - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "https://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 30s
+      retries: 3
+      start_period: 20s
     environment:
       MINIO_ROOT_USER: ${MINIO_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
@@ -72,13 +88,12 @@ services:
     env_file:
       - .env
     entrypoint: >
-      /bin/sh -c "
-      until (/usr/bin/mc config host add myminio http://${MINIO_ENDPOINT} ${MINIO_USER} ${MINIO_PASSWORD}) do echo '...waiting...' && sleep 1; done;
+      /bin/sh -c "until (/usr/bin/mc config host add myminio http://${MINIO_ENDPOINT} ${MINIO_USER} ${MINIO_PASSWORD})
+      do echo '...waiting...' && sleep 1; done;
       /usr/bin/mc mb --ignore-existing myminio/${MINIO_BUCKET};
       /usr/bin/mc event remove --event put myminio/${MINIO_BUCKET} arn:minio:sqs::PRIMARY:postgresql;
       /usr/bin/mc event add --event put myminio/${MINIO_BUCKET} arn:minio:sqs::PRIMARY:postgresql;
-      exit 0;
-      "
+      exit 0;"
     networks:
       - drop-audio-streaming
 
@@ -89,7 +104,7 @@ services:
     networks:
       - drop-audio-streaming
     ports:
-      - "9000:9000"
+      - 9001:9000
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./tls:/etc/nginx/tls:ro

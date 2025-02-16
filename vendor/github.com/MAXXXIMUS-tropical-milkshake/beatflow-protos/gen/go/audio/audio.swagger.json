@@ -16,6 +16,28 @@
     "application/json"
   ],
   "paths": {
+    "/health": {
+      "get": {
+        "operationId": "BeatService_Health",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/audioHealthResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "BeatService"
+        ]
+      }
+    },
     "/v1/beat": {
       "post": {
         "operationId": "BeatService_UploadBeat",
@@ -518,6 +540,14 @@
             "type": "object",
             "$ref": "#/definitions/audioBeat"
           }
+        }
+      }
+    },
+    "audioHealthResponse": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
         }
       }
     },

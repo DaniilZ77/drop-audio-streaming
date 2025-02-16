@@ -25,6 +25,7 @@ const (
 	BeatService_DeleteBeat_FullMethodName    = "/audio.BeatService/DeleteBeat"
 	BeatService_GetBeatParams_FullMethodName = "/audio.BeatService/GetBeatParams"
 	BeatService_AcquireBeat_FullMethodName   = "/audio.BeatService/AcquireBeat"
+	BeatService_Health_FullMethodName        = "/audio.BeatService/Health"
 )
 
 // BeatServiceClient is the client API for BeatService service.
@@ -37,6 +38,7 @@ type BeatServiceClient interface {
 	DeleteBeat(ctx context.Context, in *DeleteBeatRequest, opts ...grpc.CallOption) (*DeleteBeatResponse, error)
 	GetBeatParams(ctx context.Context, in *GetBeatParamsRequest, opts ...grpc.CallOption) (*GetBeatParamsResponse, error)
 	AcquireBeat(ctx context.Context, in *AcquireBeatRequest, opts ...grpc.CallOption) (*AcquireBeatResponse, error)
+	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
 }
 
 type beatServiceClient struct {
@@ -107,6 +109,16 @@ func (c *beatServiceClient) AcquireBeat(ctx context.Context, in *AcquireBeatRequ
 	return out, nil
 }
 
+func (c *beatServiceClient) Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HealthResponse)
+	err := c.cc.Invoke(ctx, BeatService_Health_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BeatServiceServer is the server API for BeatService service.
 // All implementations must embed UnimplementedBeatServiceServer
 // for forward compatibility.
@@ -117,6 +129,7 @@ type BeatServiceServer interface {
 	DeleteBeat(context.Context, *DeleteBeatRequest) (*DeleteBeatResponse, error)
 	GetBeatParams(context.Context, *GetBeatParamsRequest) (*GetBeatParamsResponse, error)
 	AcquireBeat(context.Context, *AcquireBeatRequest) (*AcquireBeatResponse, error)
+	Health(context.Context, *HealthRequest) (*HealthResponse, error)
 	mustEmbedUnimplementedBeatServiceServer()
 }
 
@@ -144,6 +157,9 @@ func (UnimplementedBeatServiceServer) GetBeatParams(context.Context, *GetBeatPar
 }
 func (UnimplementedBeatServiceServer) AcquireBeat(context.Context, *AcquireBeatRequest) (*AcquireBeatResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AcquireBeat not implemented")
+}
+func (UnimplementedBeatServiceServer) Health(context.Context, *HealthRequest) (*HealthResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
 }
 func (UnimplementedBeatServiceServer) mustEmbedUnimplementedBeatServiceServer() {}
 func (UnimplementedBeatServiceServer) testEmbeddedByValue()                     {}
@@ -274,6 +290,24 @@ func _BeatService_AcquireBeat_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BeatService_Health_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HealthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BeatServiceServer).Health(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BeatService_Health_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BeatServiceServer).Health(ctx, req.(*HealthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BeatService_ServiceDesc is the grpc.ServiceDesc for BeatService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -304,6 +338,10 @@ var BeatService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AcquireBeat",
 			Handler:    _BeatService_AcquireBeat_Handler,
+		},
+		{
+			MethodName: "Health",
+			Handler:    _BeatService_Health_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

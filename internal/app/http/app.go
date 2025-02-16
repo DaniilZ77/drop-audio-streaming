@@ -8,7 +8,7 @@ import (
 	"net/http/pprof"
 
 	audiov1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio"
-	userclient "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/client/user/grpc"
+	client "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/client"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/config"
 	router "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/http"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
@@ -29,7 +29,7 @@ func New(
 	ctx context.Context,
 	cfg *config.Config,
 	beatService *beat.BeatService,
-	grpcUserClient *userclient.Client,
+	grpcUserClient *client.Client,
 ) *App {
 	// creds, err := credentials.NewClientTLSFromFile(cfg.Cert, "") nolint
 	// if err != nil {

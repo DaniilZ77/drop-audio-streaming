@@ -5,6 +5,7 @@ import (
 	"time"
 
 	audiov1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio"
+	userv1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/user"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -195,10 +196,10 @@ func ToModelGetBeatsParams(params *audiov1.GetBeatsRequest) GetBeatsParams {
 	return res
 }
 
-func ToGetBeatsResponse(beats []Beat, total int, params GetBeatsParams) *audiov1.GetBeatsResponse {
+func ToGetBeatsResponse(beats []Beat, users []*userv1.GetUserResponse, total int, params GetBeatsParams) *audiov1.GetBeatsResponse {
 	var res []*audiov1.Beat
-	for _, b := range beats {
-		res = append(res, toResponseBeat(b))
+	for i := range beats {
+		res = append(res, toResponseBeat(beats[i], users[i]))
 	}
 
 	return &audiov1.GetBeatsResponse{
@@ -212,7 +213,7 @@ func ToGetBeatsResponse(beats []Beat, total int, params GetBeatsParams) *audiov1
 	}
 }
 
-func toResponseBeat(b Beat) *audiov1.Beat {
+func toResponseBeat(b Beat, u *userv1.GetUserResponse) *audiov1.Beat {
 	scale := audiov1.Scale_MINOR
 	major := strings.ToLower(audiov1.Scale_name[int32(audiov1.Scale_MAJOR)])
 	if b.NoteScale != nil && *b.NoteScale == major {
@@ -227,7 +228,9 @@ func toResponseBeat(b Beat) *audiov1.Beat {
 	return &audiov1.Beat{
 		BeatId: b.ID.String(),
 		Beatmaker: &audiov1.Beatmaker{
-			Id: b.BeatmakerID.String(),
+			Id:        b.BeatmakerID.String(),
+			Username:  u.Username,
+			Pseudonym: u.Pseudonym,
 		},
 		ImageDownloadUrl: b.ImagePath,
 		Name:             b.Name,
