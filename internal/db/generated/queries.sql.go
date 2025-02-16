@@ -7,13 +7,15 @@ package generated
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 const deleteBeat = `-- name: DeleteBeat :exec
 update beats set is_deleted = true where id = $1
 `
 
-func (q *Queries) DeleteBeat(ctx context.Context, id int32) error {
+func (q *Queries) DeleteBeat(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteBeat, id)
 	return err
 }
@@ -22,7 +24,7 @@ const deleteBeatGenres = `-- name: DeleteBeatGenres :exec
 delete from beats_genres where beat_id = $1
 `
 
-func (q *Queries) DeleteBeatGenres(ctx context.Context, beatID int32) error {
+func (q *Queries) DeleteBeatGenres(ctx context.Context, beatID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteBeatGenres, beatID)
 	return err
 }
@@ -31,7 +33,7 @@ const deleteBeatMoods = `-- name: DeleteBeatMoods :exec
 delete from beats_moods where beat_id = $1
 `
 
-func (q *Queries) DeleteBeatMoods(ctx context.Context, beatID int32) error {
+func (q *Queries) DeleteBeatMoods(ctx context.Context, beatID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteBeatMoods, beatID)
 	return err
 }
@@ -40,7 +42,7 @@ const deleteBeatNotes = `-- name: DeleteBeatNotes :exec
 delete from beats_notes where beat_id = $1
 `
 
-func (q *Queries) DeleteBeatNotes(ctx context.Context, beatID int32) error {
+func (q *Queries) DeleteBeatNotes(ctx context.Context, beatID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteBeatNotes, beatID)
 	return err
 }
@@ -49,16 +51,16 @@ const deleteBeatTags = `-- name: DeleteBeatTags :exec
 delete from beats_tags where beat_id = $1
 `
 
-func (q *Queries) DeleteBeatTags(ctx context.Context, beatID int32) error {
+func (q *Queries) DeleteBeatTags(ctx context.Context, beatID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteBeatTags, beatID)
 	return err
 }
 
 const getBeatByID = `-- name: GetBeatByID :one
-select id, beatmaker_id, file_path, image_path, name, description, is_file_downloaded, is_image_downloaded, is_deleted, created_at, updated_at, bpm from beats where id = $1
+select id, beatmaker_id, file_path, image_path, archive_path, name, description, is_file_downloaded, is_image_downloaded, is_archive_downloaded, range_start, range_end, is_deleted, created_at, updated_at, bpm from beats where id = $1
 `
 
-func (q *Queries) GetBeatByID(ctx context.Context, id int32) (Beat, error) {
+func (q *Queries) GetBeatByID(ctx context.Context, id uuid.UUID) (Beat, error) {
 	row := q.db.QueryRow(ctx, getBeatByID, id)
 	var i Beat
 	err := row.Scan(
@@ -66,10 +68,14 @@ func (q *Queries) GetBeatByID(ctx context.Context, id int32) (Beat, error) {
 		&i.BeatmakerID,
 		&i.FilePath,
 		&i.ImagePath,
+		&i.ArchivePath,
 		&i.Name,
 		&i.Description,
 		&i.IsFileDownloaded,
 		&i.IsImageDownloaded,
+		&i.IsArchiveDownloaded,
+		&i.RangeStart,
+		&i.RangeEnd,
 		&i.IsDeleted,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -174,19 +180,33 @@ func (q *Queries) GetBeatTagParams(ctx context.Context) ([]Tag, error) {
 	return items, nil
 }
 
+const getOwnerByBeatID = `-- name: GetOwnerByBeatID :one
+select beat_id, user_id from beats_owners where beat_id = $1
+`
+
+func (q *Queries) GetOwnerByBeatID(ctx context.Context, beatID uuid.UUID) (BeatsOwner, error) {
+	row := q.db.QueryRow(ctx, getOwnerByBeatID, beatID)
+	var i BeatsOwner
+	err := row.Scan(&i.BeatID, &i.UserID)
+	return i, err
+}
+
 const saveBeat = `-- name: SaveBeat :exec
-insert into beats ("id", "beatmaker_id", "bpm", "description", "name", "file_path", "image_path")
-values ($1, $2, $3, $4, $5, $6, $7)
+insert into beats ("id", "beatmaker_id", "bpm", "description", "name", "file_path", "image_path", "archive_path", "range_start", "range_end")
+values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 `
 
 type SaveBeatParams struct {
-	ID          int32
-	BeatmakerID int32
+	ID          uuid.UUID
+	BeatmakerID uuid.UUID
 	Bpm         int32
 	Description string
 	Name        string
 	FilePath    string
 	ImagePath   string
+	ArchivePath string
+	RangeStart  int64
+	RangeEnd    int64
 }
 
 func (q *Queries) SaveBeat(ctx context.Context, arg SaveBeatParams) error {
@@ -198,18 +218,21 @@ func (q *Queries) SaveBeat(ctx context.Context, arg SaveBeatParams) error {
 		arg.Name,
 		arg.FilePath,
 		arg.ImagePath,
+		arg.ArchivePath,
+		arg.RangeStart,
+		arg.RangeEnd,
 	)
 	return err
 }
 
 type SaveGenresParams struct {
-	BeatID  int32
-	GenreID int32
+	BeatID  uuid.UUID
+	GenreID uuid.UUID
 }
 
 type SaveMoodsParams struct {
-	BeatID int32
-	MoodID int32
+	BeatID uuid.UUID
+	MoodID uuid.UUID
 }
 
 const saveNote = `-- name: SaveNote :exec
@@ -218,9 +241,9 @@ values ($1, $2, $3)
 `
 
 type SaveNoteParams struct {
-	BeatID int32
-	NoteID int32
-	Scale  Scale
+	BeatID uuid.UUID
+	NoteID uuid.UUID
+	Scale  NoteScale
 }
 
 func (q *Queries) SaveNote(ctx context.Context, arg SaveNoteParams) error {
@@ -228,9 +251,23 @@ func (q *Queries) SaveNote(ctx context.Context, arg SaveNoteParams) error {
 	return err
 }
 
+const saveOwner = `-- name: SaveOwner :exec
+insert into beats_owners ("beat_id", "user_id") values ($1, $2)
+`
+
+type SaveOwnerParams struct {
+	BeatID uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) SaveOwner(ctx context.Context, arg SaveOwnerParams) error {
+	_, err := q.db.Exec(ctx, saveOwner, arg.BeatID, arg.UserID)
+	return err
+}
+
 type SaveTagsParams struct {
-	BeatID int32
-	TagID  int32
+	BeatID uuid.UUID
+	TagID  uuid.UUID
 }
 
 const updateBeat = `-- name: UpdateBeat :one
@@ -238,19 +275,25 @@ update beats
 set "name" = coalesce($1, "name"),
     "bpm" = coalesce($2, "bpm"),
     "description" = coalesce($3, "description"),
-    "is_image_downloaded" = coalesce($4, "is_image_downloaded"),
-    "is_file_downloaded" = coalesce($5, "is_file_downloaded")
-where "id" = $6 and "is_deleted" = false
-returning id, beatmaker_id, file_path, image_path, name, description, is_file_downloaded, is_image_downloaded, is_deleted, created_at, updated_at, bpm
+    "range_start" = coalesce($4, "range_start"),
+    "range_end" = coalesce($5, "range_end"),
+    "is_image_downloaded" = coalesce($6, "is_image_downloaded"),
+    "is_file_downloaded" = coalesce($7, "is_file_downloaded"),
+    "is_archive_downloaded" = coalesce($8, "is_archive_downloaded")
+where "id" = $9 and "is_deleted" = false
+returning id, beatmaker_id, file_path, image_path, archive_path, name, description, is_file_downloaded, is_image_downloaded, is_archive_downloaded, range_start, range_end, is_deleted, created_at, updated_at, bpm
 `
 
 type UpdateBeatParams struct {
-	Name              *string
-	Bpm               *int32
-	Description       *string
-	IsImageDownloaded *bool
-	IsFileDownloaded  *bool
-	ID                int32
+	Name                *string
+	Bpm                 *int32
+	Description         *string
+	RangeStart          *int64
+	RangeEnd            *int64
+	IsImageDownloaded   *bool
+	IsFileDownloaded    *bool
+	IsArchiveDownloaded *bool
+	ID                  uuid.UUID
 }
 
 func (q *Queries) UpdateBeat(ctx context.Context, arg UpdateBeatParams) (Beat, error) {
@@ -258,8 +301,11 @@ func (q *Queries) UpdateBeat(ctx context.Context, arg UpdateBeatParams) (Beat, e
 		arg.Name,
 		arg.Bpm,
 		arg.Description,
+		arg.RangeStart,
+		arg.RangeEnd,
 		arg.IsImageDownloaded,
 		arg.IsFileDownloaded,
+		arg.IsArchiveDownloaded,
 		arg.ID,
 	)
 	var i Beat
@@ -268,10 +314,14 @@ func (q *Queries) UpdateBeat(ctx context.Context, arg UpdateBeatParams) (Beat, e
 		&i.BeatmakerID,
 		&i.FilePath,
 		&i.ImagePath,
+		&i.ArchivePath,
 		&i.Name,
 		&i.Description,
 		&i.IsFileDownloaded,
 		&i.IsImageDownloaded,
+		&i.IsArchiveDownloaded,
+		&i.RangeStart,
+		&i.RangeEnd,
 		&i.IsDeleted,
 		&i.CreatedAt,
 		&i.UpdatedAt,

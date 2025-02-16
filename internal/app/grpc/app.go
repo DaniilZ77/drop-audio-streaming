@@ -29,6 +29,13 @@ func New(
 	beatService *beat.BeatService,
 	grpcUserClient *userclient.Client,
 ) *App {
+	requireAdmin := map[string]bool{
+		"/audio.BeatService/UploadBeat":  true,
+		"/audio.BeatService/UpdateBeat":  true,
+		"/audio.BeatService/DeleteBeat":  true,
+		"/audio.BeatService/AcquireBeat": true,
+	}
+
 	opts := []grpc.ServerOption{}
 
 	// Logger
@@ -51,6 +58,7 @@ func New(
 	opts = append(opts, grpc.ChainUnaryInterceptor(
 		recovery.UnaryServerInterceptor(recoveryOpts...),
 		logging.UnaryServerInterceptor(interceptorLogger(logger.Log()), loggingOpts...),
+		audio.AuthMiddleware(cfg.JWTSecret, requireAdmin),
 	))
 
 	// TLS nolint
@@ -64,7 +72,7 @@ func New(
 	gRPCServer := grpc.NewServer(opts...)
 
 	// Register services
-	audio.Register(gRPCServer, beatService, beatService)
+	audio.Register(gRPCServer, beatService, beatService, beatService)
 
 	return &App{
 		gRPCServer: gRPCServer,

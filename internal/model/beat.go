@@ -6,26 +6,30 @@ import (
 
 	audiov1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type (
 	Beat struct {
-		ID                int
-		BeatmakerID       int
-		FilePath          string
-		ImagePath         string
-		Name              string
-		Description       string
-		IsFileDownloaded  bool
-		IsImageDownloaded bool
-		Bpm               int
-		CreatedAt         time.Time
-		Genres            []string
-		Tags              []string
-		Moods             []string
-		NoteName          *string
-		NoteScale         *string
+		ID                  uuid.UUID
+		BeatmakerID         uuid.UUID
+		FilePath            string
+		ImagePath           string
+		Name                string
+		Description         string
+		IsFileDownloaded    bool
+		IsImageDownloaded   bool
+		IsArchiveDownloaded bool
+		Bpm                 int
+		RangeStart          int
+		RangeEnd            int
+		CreatedAt           time.Time
+		Genres              []string
+		Tags                []string
+		Moods               []string
+		NoteName            *string
+		NoteScale           *string
 	}
 
 	GetBeatsNote struct {
@@ -39,12 +43,12 @@ type (
 	}
 
 	GetBeatsParams struct {
-		BeatID       *int
+		BeatID       *uuid.UUID
 		Genre        []string
 		Mood         []string
 		Tag          []string
 		Note         *GetBeatsNote
-		BeatmakerID  *int
+		BeatmakerID  *uuid.UUID
 		BeatName     *string
 		Bpm          *int
 		OrderBy      *OrderBy
@@ -75,6 +79,27 @@ type (
 		Tags   []generated.SaveTagsParams
 		Moods  []generated.SaveMoodsParams
 	}
+
+	MediaType string
+
+	AdminScale string
+
+	MediaMeta struct {
+		MediaType     MediaType
+		ContentType   string
+		ContentLength int64
+		Name          string
+		Expiry        int64
+		URL           string
+	}
+)
+
+const (
+	AdminScaleMinor AdminScale = "minor"
+	AdminScaleMajor AdminScale = "major"
+	File            MediaType  = "file"
+	Archive         MediaType  = "archive"
+	Image           MediaType  = "image"
 )
 
 func ToModelSaveBeatParams(beat *audiov1.UploadBeatRequest) SaveBeatParams {
@@ -84,40 +109,42 @@ func ToModelSaveBeatParams(beat *audiov1.UploadBeatRequest) SaveBeatParams {
 
 	for _, v := range beat.BeatGenre {
 		genres = append(genres, generated.SaveGenresParams{
-			GenreID: int32(v),
-			BeatID:  int32(beat.BeatId),
+			GenreID: uuid.MustParse(v),
+			BeatID:  uuid.MustParse(beat.BeatId),
 		})
 	}
 
 	for _, v := range beat.BeatTag {
 		tags = append(tags, generated.SaveTagsParams{
-			TagID:  int32(v),
-			BeatID: int32(beat.BeatId),
+			TagID:  uuid.MustParse(v),
+			BeatID: uuid.MustParse(beat.BeatId),
 		})
 	}
 
 	for _, v := range beat.BeatMood {
 		moods = append(moods, generated.SaveMoodsParams{
-			MoodID: int32(v),
-			BeatID: int32(beat.BeatId),
+			MoodID: uuid.MustParse(v),
+			BeatID: uuid.MustParse(beat.BeatId),
 		})
 	}
 
 	return SaveBeatParams{
 		SaveBeatParams: generated.SaveBeatParams{
-			ID:          int32(beat.BeatId),
-			BeatmakerID: int32(beat.BeatmakerId),
+			ID:          uuid.MustParse(beat.BeatId),
+			BeatmakerID: uuid.MustParse(beat.BeatmakerId),
 			Name:        beat.Name,
 			Description: beat.Description,
 			Bpm:         int32(beat.Bpm),
+			RangeStart:  beat.Range.Start,
+			RangeEnd:    beat.Range.End,
 		},
 		Genres: genres,
 		Tags:   tags,
 		Moods:  moods,
 		Note: generated.SaveNoteParams{
-			BeatID: int32(beat.BeatId),
-			NoteID: int32(beat.Note.NoteId),
-			Scale:  generated.Scale(strings.ToLower(beat.Note.Scale.String())),
+			BeatID: uuid.MustParse(beat.BeatId),
+			NoteID: uuid.MustParse(beat.Note.NoteId),
+			Scale:  generated.NoteScale(strings.ToLower(beat.Note.Scale.String())),
 		},
 	}
 }
@@ -126,7 +153,7 @@ func ToModelGetBeatsParams(params *audiov1.GetBeatsRequest) GetBeatsParams {
 	var res GetBeatsParams
 
 	if params.BeatId != nil {
-		beatID := int(*params.BeatId)
+		beatID := uuid.MustParse(*params.BeatId)
 		res.BeatID = &beatID
 	}
 
@@ -142,7 +169,7 @@ func ToModelGetBeatsParams(params *audiov1.GetBeatsRequest) GetBeatsParams {
 	}
 
 	if params.BeatmakerId != nil {
-		beatmakerID := int(*params.BeatmakerId)
+		beatmakerID := uuid.MustParse(*params.BeatmakerId)
 		res.BeatmakerID = &beatmakerID
 	}
 
@@ -198,22 +225,29 @@ func toResponseBeat(b Beat) *audiov1.Beat {
 	}
 
 	return &audiov1.Beat{
-		BeatId: int64(b.ID),
+		BeatId: b.ID.String(),
 		Beatmaker: &audiov1.Beatmaker{
-			Id: int64(b.BeatmakerID),
+			Id: b.BeatmakerID.String(),
 		},
-		Image:       b.ImagePath,
-		Name:        b.Name,
-		Description: b.Description,
-		Genre:       b.Genres,
-		Tag:         b.Tags,
-		Mood:        b.Moods,
+		ImageDownloadUrl: b.ImagePath,
+		Name:             b.Name,
+		Description:      b.Description,
+		Genre:            b.Genres,
+		Tag:              b.Tags,
+		Mood:             b.Moods,
 		Note: &audiov1.GetBeatsNote{
 			Name:  name,
 			Scale: scale,
 		},
-		Bpm:       int64(b.Bpm),
-		CreatedAt: timestamppb.New(b.CreatedAt),
+		Bpm: int64(b.Bpm),
+		Range: &audiov1.Range{
+			Start: int64(b.RangeStart),
+			End:   int64(b.RangeEnd),
+		},
+		IsFileUploaded:    b.IsFileDownloaded,
+		IsImageUploaded:   b.IsImageDownloaded,
+		IsArchiveUploaded: b.IsArchiveDownloaded,
+		CreatedAt:         timestamppb.New(b.CreatedAt),
 	}
 }
 
@@ -225,28 +259,28 @@ func ToGetBeatParamsResponse(b BeatParams) *audiov1.GetBeatParamsResponse {
 
 	for _, v := range b.Genres {
 		genres = append(genres, &audiov1.GenreParam{
-			GenreId: int64(v.ID),
+			GenreId: v.ID.String(),
 			Name:    v.Name,
 		})
 	}
 
 	for _, v := range b.Tags {
 		tags = append(tags, &audiov1.TagParam{
-			TagId: int64(v.ID),
+			TagId: v.ID.String(),
 			Name:  v.Name,
 		})
 	}
 
 	for _, v := range b.Moods {
 		moods = append(moods, &audiov1.MoodParam{
-			MoodId: int64(v.ID),
+			MoodId: v.ID.String(),
 			Name:   v.Name,
 		})
 	}
 
 	for _, v := range b.Notes {
 		notes = append(notes, &audiov1.NoteParam{
-			NoteId: int64(v.ID),
+			NoteId: v.ID.String(),
 			Name:   v.Name,
 		})
 	}
@@ -266,31 +300,31 @@ func ToModelUpdateBeatParams(req *audiov1.UpdateBeatRequest) UpdateBeatParams {
 
 	for _, v := range req.BeatGenre {
 		genres = append(genres, generated.SaveGenresParams{
-			GenreID: int32(v),
-			BeatID:  int32(req.BeatId),
+			GenreID: uuid.MustParse(v),
+			BeatID:  uuid.MustParse(req.BeatId),
 		})
 	}
 
 	for _, v := range req.BeatTag {
 		tags = append(tags, generated.SaveTagsParams{
-			TagID:  int32(v),
-			BeatID: int32(req.BeatId),
+			TagID:  uuid.MustParse(v),
+			BeatID: uuid.MustParse(req.BeatId),
 		})
 	}
 
 	for _, v := range req.BeatMood {
 		moods = append(moods, generated.SaveMoodsParams{
-			MoodID: int32(v),
-			BeatID: int32(req.BeatId),
+			MoodID: uuid.MustParse(v),
+			BeatID: uuid.MustParse(req.BeatId),
 		})
 	}
 
 	var note *generated.SaveNoteParams
 	if req.Note != nil {
 		note = &generated.SaveNoteParams{
-			BeatID: int32(req.BeatId),
-			NoteID: int32(req.Note.NoteId),
-			Scale:  generated.Scale(strings.ToLower(req.Note.Scale.String())),
+			BeatID: uuid.MustParse(req.BeatId),
+			NoteID: uuid.MustParse(req.Note.NoteId),
+			Scale:  generated.NoteScale(strings.ToLower(req.Note.Scale.String())),
 		}
 	}
 
@@ -322,18 +356,40 @@ func ToModelUpdateBeatParams(req *audiov1.UpdateBeatRequest) UpdateBeatParams {
 		isFileDownloaded = &tmp
 	}
 
+	var isArchiveDownloaded *bool
+	if req.UpdateArchive != nil && *req.UpdateArchive {
+		tmp := false
+		isArchiveDownloaded = &tmp
+	}
+
+	var rangeStart, rangeEnd *int64
+	if req.Range != nil {
+		rangeStart = &req.Range.Start
+		rangeEnd = &req.Range.End
+	}
+
 	return UpdateBeatParams{
 		UpdateBeatParams: generated.UpdateBeatParams{
-			ID:                int32(req.BeatId),
-			Name:              name,
-			Description:       description,
-			Bpm:               bpm,
-			IsImageDownloaded: isImageDownloaded,
-			IsFileDownloaded:  isFileDownloaded,
+			ID:                  uuid.MustParse(req.BeatId),
+			Name:                name,
+			Description:         description,
+			Bpm:                 bpm,
+			IsImageDownloaded:   isImageDownloaded,
+			IsFileDownloaded:    isFileDownloaded,
+			IsArchiveDownloaded: isArchiveDownloaded,
+			RangeStart:          rangeStart,
+			RangeEnd:            rangeEnd,
 		},
 		Genres: genres,
 		Moods:  moods,
 		Tags:   tags,
 		Note:   note,
+	}
+}
+
+func ToModelGetArchiveParams(req *audiov1.AcquireBeatRequest) generated.SaveOwnerParams {
+	return generated.SaveOwnerParams{
+		BeatID: uuid.MustParse(req.BeatId),
+		UserID: uuid.MustParse(req.UserId),
 	}
 }

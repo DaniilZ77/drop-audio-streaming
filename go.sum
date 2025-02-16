@@ -8,16 +8,8 @@ github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 h1:He8af
 github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6/go.mod h1:8o94RPi1/7XTJvwPpRSzSUedZrtlirdB3r9Z20bi2f8=
 github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 h1:L/gRVlceqvL25UVaW/CKtUDjefjrs0SPonmDGUVOYP0=
 github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
-github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.10 h1:DelrMjVSWoGgqlyfKyEQj+YkKLRLzMKcShN7gBkNCm0=
-github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.10/go.mod h1:oRPaAgn5hrwPORhMXVZDmMDZ4vYn7mb08yG5pfAeDTw=
-github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.11 h1:oA7lqsNw8DOQAFppUhiuT3jPO7APAH87Vf4VoOPrI3g=
-github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.11/go.mod h1:oRPaAgn5hrwPORhMXVZDmMDZ4vYn7mb08yG5pfAeDTw=
-github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.12 h1:Tj2GKwNXHjI+VFYSSZ9pUN3MI+EQRPN+GOsCDYW7ezs=
-github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.12/go.mod h1:oRPaAgn5hrwPORhMXVZDmMDZ4vYn7mb08yG5pfAeDTw=
-github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.16 h1:nSdZn1x7sZWIndzTscMdbqo36T+YUSALuNUL7fYRlx4=
-github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.16/go.mod h1:oRPaAgn5hrwPORhMXVZDmMDZ4vYn7mb08yG5pfAeDTw=
-github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.17 h1:n8MMzCIrUBBJngOB5YkvjYZYEyXRwW0rb9Qyk182gcU=
-github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.17/go.mod h1:oRPaAgn5hrwPORhMXVZDmMDZ4vYn7mb08yG5pfAeDTw=
+github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.29 h1:R1ep0HgO9jICBFr0GCAurvExXDbz7ranexXggtSo5Qs=
+github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos v0.1.29/go.mod h1:oRPaAgn5hrwPORhMXVZDmMDZ4vYn7mb08yG5pfAeDTw=
 github.com/Masterminds/squirrel v1.5.4 h1:uUcX/aBc8O7Fg9kaISIUsHXdKuqehiXAMQTYX8afzqM=
 github.com/Masterminds/squirrel v1.5.4/go.mod h1:NNaOrjSoIDfDA40n7sr2tPNZRfjzjA400rg+riTZj10=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
@@ -70,6 +62,8 @@ github.com/goccy/go-json v0.10.4/go.mod h1:oq7eo15ShAhp70Anwd5lgX2pLfOS3QCiwU/PU
 github.com/godbus/dbus/v5 v5.0.4/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
 github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
+github.com/golang-jwt/jwt v3.2.2+incompatible h1:IfV12K8xAKAnZqdXVzCZ+TOjboZ2keLg81eXfW3O+oY=
+github.com/golang-jwt/jwt v3.2.2+incompatible/go.mod h1:8pz2t5EyA70fFQQSrl6XZXzqecmYZeUEB8OUGHkxJ+I=
 github.com/golang-migrate/migrate/v4 v4.18.1 h1:JML/k+t4tpHCpQTCAD62Nu43NUFzHY4CV3uAuvHGC+Y=
 github.com/golang-migrate/migrate/v4 v4.18.1/go.mod h1:HAX6m3sQgcdO81tdjn5exv20+3Kb13cmGli1hrD6hks=
 github.com/google/cel-go v0.23.0 h1:knsnzeUOcREUFo0ZFJqZI8Rk6uEVyobAlir7GEbf5v0=

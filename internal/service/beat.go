@@ -2,8 +2,13 @@ package beat
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base64"
+	"errors"
+	"fmt"
 	"io"
-	"sync"
+	"time"
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
@@ -11,49 +16,78 @@ import (
 	"github.com/google/uuid"
 )
 
+type BeatServiceConfig struct {
+	fileSizeLimit      int64
+	archiveSizeLimit   int64
+	imageSizeLimit     int64
+	verificationSecret string
+	urlTTL             int
+}
+
+func NewBeatServiceConfig(fileSizeLimit int64, archiveSizeLimit int64, imageSizeLimit int64, verificationSecret string, urlTTL int) *BeatServiceConfig {
+	return &BeatServiceConfig{
+		fileSizeLimit:      fileSizeLimit,
+		archiveSizeLimit:   archiveSizeLimit,
+		imageSizeLimit:     imageSizeLimit,
+		verificationSecret: verificationSecret,
+		urlTTL:             urlTTL,
+	}
+}
+
 type BeatModifier interface {
 	SaveBeat(ctx context.Context, beat model.SaveBeatParams) error
 	UpdateBeat(ctx context.Context, beat model.UpdateBeatParams) (*generated.Beat, error)
-	DeleteBeat(ctx context.Context, id int) error
+	DeleteBeat(ctx context.Context, id uuid.UUID) error
+	SaveOwner(ctx context.Context, owner generated.SaveOwnerParams) error
 }
 
 type BeatProvider interface {
-	GetBeatByID(ctx context.Context, id int) (*generated.Beat, error)
+	GetBeatByID(ctx context.Context, id uuid.UUID) (*generated.Beat, error)
 	GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total *int, err error)
 	GetBeatParams(ctx context.Context) (params *model.BeatParams, err error)
+	GetOwnerByBeatID(ctx context.Context, beatID uuid.UUID) (*generated.BeatsOwner, error)
 }
 
 type URLProvider interface {
-	GetSaveFileURL(ctx context.Context, path string) (*string, error)
-	GetDownloadFileURL(ctx context.Context, path string) (*string, error)
+	GetDownloadMediaURL(ctx context.Context, path string, expires time.Duration) (*string, error)
 }
 
 type BeatBytesProvider interface {
 	GetBeatBytes(ctx context.Context, path string, s, e *int) (file io.ReadCloser, size *int, contentType *string, err error)
 }
 
-type BeatService struct {
-	beatSaver         BeatModifier
-	beatProvider      BeatProvider
-	urlProvider       URLProvider
-	beatBytesProvider BeatBytesProvider
+type MediaUploader interface {
+	UploadMedia(ctx context.Context, path, contentType string, file io.Reader) error
 }
 
-func New(
+type BeatService struct {
+	beatModifier      BeatModifier
+	beatProvider      BeatProvider
+	urlProvider       URLProvider
+	mediaUploader     MediaUploader
+	beatBytesProvider BeatBytesProvider
+	config            *BeatServiceConfig
+}
+
+func NewBeatService(
 	beatSaver BeatModifier,
 	beatProvider BeatProvider,
 	urlProvider URLProvider,
+	mediaUploader MediaUploader,
 	beatBytesProvider BeatBytesProvider,
+	config *BeatServiceConfig,
 ) *BeatService {
 	return &BeatService{
-		beatSaver:         beatSaver,
+		beatModifier:      beatSaver,
 		beatProvider:      beatProvider,
 		urlProvider:       urlProvider,
+		mediaUploader:     mediaUploader,
 		beatBytesProvider: beatBytesProvider,
+		config:            config,
 	}
 }
 
-func (s *BeatService) GetBeatStream(ctx context.Context, beatID int, start, end *int) (file io.ReadCloser, size *int, contentType *string, err error) {
+func (s *BeatService) GetBeatStream(ctx context.Context, beatID uuid.UUID, start, end *int) (file io.ReadCloser, size *int, contentType *string, err error) {
 	beat, err := s.beatProvider.GetBeatByID(ctx, beatID)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
@@ -69,78 +103,44 @@ func (s *BeatService) GetBeatStream(ctx context.Context, beatID int, start, end 
 	return file, size, contentType, nil
 }
 
-func (s *BeatService) StreamBeat(ctx context.Context, r io.Reader, w io.Writer, chunkSize int) error {
-	data := make(chan []byte)
-	quit := make(chan struct{}, 1)
-	var wg sync.WaitGroup
-	wg.Add(2)
+func (s *BeatService) getSaveMediaURL(name string, mt model.MediaType, exp time.Time) string {
+	url := "/v1/beat?"
 
-	go func() {
-		defer close(data)
-		defer wg.Done()
+	url += fmt.Sprintf("name=%s", name)
+	url += fmt.Sprintf("&type=%s", mt)
+	url += fmt.Sprintf("&exp=%d", exp.Unix())
 
-		for {
-			buf := make([]byte, chunkSize)
-			n, err := r.Read(buf)
-			if err != nil && err != io.EOF {
-				logger.Log().Error(ctx, err.Error())
-				return
-			}
+	mac := hmac.New(sha1.New, []byte(s.config.verificationSecret))
+	mac.Write([]byte(url))
 
-			if n == 0 {
-				return
-			}
+	sig := base64.URLEncoding.EncodeToString(mac.Sum(nil))
+	url += fmt.Sprintf("&hash=%s", sig)
 
-			select {
-			case data <- buf[:n]:
-			case <-quit:
-				return
-			}
-		}
-	}()
-
-	go func() {
-		defer func() { quit <- struct{}{} }()
-		defer wg.Done()
-		for chunk := range data {
-			if _, err := w.Write(chunk); err != nil {
-				logger.Log().Error(ctx, err.Error())
-				return
-			}
-		}
-	}()
-
-	wg.Wait()
-
-	return nil
+	return url
 }
 
-func (s *BeatService) SaveBeat(ctx context.Context, beat model.SaveBeatParams) (fileUploadURL, imageUploadURL *string, err error) {
+func (s *BeatService) SaveBeat(ctx context.Context, beat model.SaveBeatParams) (*string, *string, *string, error) {
 	filePath := uuid.New().String()
 	beat.FilePath = filePath
 
 	imagePath := uuid.New().String()
 	beat.ImagePath = imagePath
 
-	err = s.beatSaver.SaveBeat(ctx, beat)
+	archivePath := uuid.New().String()
+	beat.ArchivePath = archivePath
+
+	err := s.beatModifier.SaveBeat(ctx, beat)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	fileUploadURL, err = s.urlProvider.GetSaveFileURL(ctx, filePath)
-	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		return nil, nil, err
-	}
+	exp := time.Now().Add(time.Minute * time.Duration(s.config.urlTTL))
+	fileUploadURL := s.getSaveMediaURL(filePath, model.File, exp)
+	imageUploadURL := s.getSaveMediaURL(imagePath, model.Image, exp)
+	archiveUploadURL := s.getSaveMediaURL(archivePath, model.Archive, exp)
 
-	imageUploadURL, err = s.urlProvider.GetSaveFileURL(ctx, imagePath)
-	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		return nil, nil, err
-	}
-
-	return
+	return &fileUploadURL, &imageUploadURL, &archiveUploadURL, nil
 }
 
 func (s *BeatService) GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total *int, err error) {
@@ -151,7 +151,7 @@ func (s *BeatService) GetBeats(ctx context.Context, params model.GetBeatsParams)
 	}
 
 	for i, v := range beats {
-		url, err := s.urlProvider.GetDownloadFileURL(ctx, v.ImagePath)
+		url, err := s.urlProvider.GetDownloadMediaURL(ctx, v.ImagePath, time.Minute*time.Duration(s.config.urlTTL))
 		if err != nil {
 			logger.Log().Error(ctx, err.Error())
 			return nil, nil, err
@@ -167,32 +167,105 @@ func (s *BeatService) GetBeatParams(ctx context.Context) (params *model.BeatPara
 	return s.beatProvider.GetBeatParams(ctx)
 }
 
-func (s *BeatService) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeatParams) (fileUploadURL, imageUploadURL *string, err error) {
-	beat, err := s.beatSaver.UpdateBeat(ctx, updateBeat)
+func (s *BeatService) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeatParams) (*string, *string, *string, error) {
+	beat, err := s.beatModifier.UpdateBeat(ctx, updateBeat)
 	if err != nil {
 		logger.Log().Error(ctx, err.Error())
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
+	exp := time.Now().Add(time.Minute * time.Duration(s.config.urlTTL))
+	var fileUploadURL, imageUploadURL, archiveUploadURL string
 	if !beat.IsFileDownloaded {
-		fileUploadURL, err = s.urlProvider.GetSaveFileURL(ctx, beat.FilePath)
-		if err != nil {
-			logger.Log().Error(ctx, err.Error())
-			return nil, nil, err
-		}
+		fileUploadURL = s.getSaveMediaURL(beat.FilePath, model.File, exp)
 	}
 
 	if !beat.IsImageDownloaded {
-		imageUploadURL, err = s.urlProvider.GetSaveFileURL(ctx, beat.ImagePath)
-		if err != nil {
-			logger.Log().Error(ctx, err.Error())
-			return nil, nil, err
+		imageUploadURL = s.getSaveMediaURL(beat.ImagePath, model.Image, exp)
+	}
+
+	if !beat.IsArchiveDownloaded {
+		archiveUploadURL = s.getSaveMediaURL(beat.ArchivePath, model.Archive, exp)
+	}
+
+	return &fileUploadURL, &imageUploadURL, &archiveUploadURL, nil
+}
+
+func (s *BeatService) DeleteBeat(ctx context.Context, id uuid.UUID) error {
+	return s.beatModifier.DeleteBeat(ctx, id)
+}
+
+func (s *BeatService) UploadMedia(ctx context.Context, file io.Reader, m model.MediaMeta) error {
+	if m.Expiry < time.Now().Unix() {
+		logger.Log().Error(ctx, model.ErrURLExpired.Error())
+		return &model.ModelError{Err: model.ErrURLExpired}
+	}
+
+	switch m.MediaType {
+	case model.File:
+		if m.ContentLength > s.config.fileSizeLimit {
+			logger.Log().Debug(ctx, model.ErrFileSizeExceeded.Error())
+			return model.NewErr(model.ErrFileSizeExceeded, fmt.Sprintf("%d > %d", m.ContentLength, s.config.fileSizeLimit))
+		}
+	case model.Archive:
+		if m.ContentLength > s.config.archiveSizeLimit {
+			logger.Log().Debug(ctx, model.ErrArchiveSizeExceeded.Error())
+			return model.NewErr(model.ErrArchiveSizeExceeded, fmt.Sprintf("%d > %d", m.ContentLength, s.config.archiveSizeLimit))
+		}
+	case model.Image:
+		if m.ContentLength > s.config.imageSizeLimit {
+			logger.Log().Debug(ctx, model.ErrImageSizeExceeded.Error())
+			return model.NewErr(model.ErrImageSizeExceeded, fmt.Sprintf("%d > %d", m.ContentLength, s.config.imageSizeLimit))
 		}
 	}
 
-	return fileUploadURL, imageUploadURL, nil
+	url := s.getSaveMediaURL(m.Name, m.MediaType, time.Unix(m.Expiry, 0))
+	if url != m.URL {
+		logger.Log().Debug(ctx, model.ErrInvalidHash.Error())
+		return &model.ModelError{Err: model.ErrInvalidHash}
+	}
+
+	if err := s.mediaUploader.UploadMedia(ctx, m.Name, m.ContentType, file); err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return err
+	}
+
+	return nil
 }
 
-func (s *BeatService) DeleteBeat(ctx context.Context, id int) error {
-	return s.beatSaver.DeleteBeat(ctx, id)
+func (s *BeatService) GetBeatArchive(ctx context.Context, params generated.SaveOwnerParams) (*string, error) {
+	beat, err := s.beatProvider.GetBeatByID(ctx, params.BeatID)
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, err
+	}
+
+	if !beat.IsArchiveDownloaded {
+		logger.Log().Debug(ctx, model.ErrArchiveNotFound.Error())
+		return nil, &model.ModelError{Err: model.ErrArchiveNotFound}
+	}
+
+	owner, err := s.beatProvider.GetOwnerByBeatID(ctx, params.BeatID)
+	if err != nil && !errors.Is(err, model.ErrOwnerNotFound) {
+		logger.Log().Error(ctx, err.Error())
+		return nil, err
+	}
+
+	if errors.Is(err, model.ErrOwnerNotFound) {
+		if err := s.beatModifier.SaveOwner(ctx, params); err != nil {
+			logger.Log().Error(ctx, err.Error())
+			return nil, err
+		}
+	} else if params.UserID != owner.UserID {
+		logger.Log().Debug(ctx, model.ErrInvalidOwner.Error())
+		return nil, model.NewErr(model.ErrInvalidOwner, "beat acquired by another owner")
+	}
+
+	url, err := s.urlProvider.GetDownloadMediaURL(ctx, beat.ArchivePath, time.Minute*time.Duration(s.config.urlTTL))
+	if err != nil {
+		logger.Log().Error(ctx, err.Error())
+		return nil, err
+	}
+
+	return url, nil
 }

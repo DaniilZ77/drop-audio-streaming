@@ -23,6 +23,9 @@ type (
 		GRPCUserClientAddr string
 		HTTPPort           string
 		ReadTimeout        int
+		VerificationSecret string
+		URLTTL             int
+		JWTSecret          string
 	}
 
 	Log struct {
@@ -40,7 +43,10 @@ type (
 	}
 
 	Audio struct {
-		ChunkSize int
+		ChunkSize        int
+		FileSizeLimit    int64
+		ArchiveSizeLimit int64
+		ImageSizeLimit   int64
 	}
 
 	TLS struct {
@@ -55,6 +61,9 @@ func NewConfig() (*Config, error) {
 	dbURL := flag.String("db_url", "", "url for connection to database")
 	httpPort := flag.String("http_port", "localhost:8080", "HTTP Port")
 	readTimeout := flag.Int("read_timeout", 5, "read timeout")
+	verificationSecret := flag.String("verification_secret", "secret", "secret to verify url data")
+	urlTTL := flag.Int("url_ttl", 10, "url ttl in minutes")
+	jwtSecret := flag.String("jwt_secret", "secret", "jwt secret")
 
 	// TLS
 	cert := flag.String("cert", "", "path to cert file")
@@ -76,6 +85,11 @@ func NewConfig() (*Config, error) {
 	grpcClientTimeout := flag.Duration("grpc_client_timeout", 2*time.Second, "grpc client timeout")
 	grpcUserClientAddr := flag.String("grpc_user_client_addr", "", "grpc user client addr")
 
+	// media limits
+	fileSizeLimit := flag.Int64("file_size_limit", 2<<24, "file size limit in bytes")
+	archiveSizeLimit := flag.Int64("archive_size_limit", 2<<31, "archive size limit in bytes")
+	imageSizeLimit := flag.Int64("image_size_limit", 2<<24, "image size limit in bytes")
+
 	flag.Parse()
 
 	cfg := &Config{
@@ -86,6 +100,9 @@ func NewConfig() (*Config, error) {
 			GRPCUserClientAddr: *grpcUserClientAddr,
 			HTTPPort:           *httpPort,
 			ReadTimeout:        *readTimeout,
+			VerificationSecret: *verificationSecret,
+			URLTTL:             *urlTTL,
+			JWTSecret:          *jwtSecret,
 		},
 		Log: Log{
 			Level: *logLevel,
@@ -104,7 +121,10 @@ func NewConfig() (*Config, error) {
 			Key:  *key,
 		},
 		Audio: Audio{
-			ChunkSize: *chunkSize,
+			ChunkSize:        *chunkSize,
+			FileSizeLimit:    *fileSizeLimit,
+			ArchiveSizeLimit: *archiveSizeLimit,
+			ImageSizeLimit:   *imageSizeLimit,
 		},
 	}
 

@@ -11,35 +11,33 @@ import (
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
+	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 )
 
 type BeatProvider interface {
-	GetBeatStream(ctx context.Context, beatID int, start, end *int) (file io.ReadCloser, size *int, contentType *string, err error)
+	GetBeatStream(ctx context.Context, beatID uuid.UUID, start, end *int) (file io.ReadCloser, size *int, contentType *string, err error)
 }
 
-type BeatStreamer interface {
-	StreamBeat(ctx context.Context, r io.Reader, w io.Writer, chunkSize int) error
+type MediaUploader interface {
+	UploadMedia(ctx context.Context, file io.Reader, m model.MediaMeta) error
 }
 
 type Router struct {
-	app          *runtime.ServeMux
-	beatProvider BeatProvider
-	beatStreamer BeatStreamer
-	chunkSize    int
+	app           *runtime.ServeMux
+	beatProvider  BeatProvider
+	mediaUploader MediaUploader
 }
 
 func NewRouter(
 	app *runtime.ServeMux,
 	beatProvider BeatProvider,
-	beatStreamer BeatStreamer,
-	chunkSize int,
+	mediaUploader MediaUploader,
 ) {
 	r := &Router{
-		app:          app,
-		beatProvider: beatProvider,
-		beatStreamer: beatStreamer,
-		chunkSize:    chunkSize,
+		app:           app,
+		beatProvider:  beatProvider,
+		mediaUploader: mediaUploader,
 	}
 
 	r.initRoutes()
@@ -47,6 +45,7 @@ func NewRouter(
 
 func (r *Router) initRoutes() {
 	_ = r.app.HandlePath(http.MethodGet, "/v1/beat/{id}/stream", r.stream)
+	_ = r.app.HandlePath(http.MethodPut, "/v1/beat", r.upload)
 }
 
 func parseRangeHeader(ctx context.Context, req *http.Request) (start, end *int, err error) {
@@ -83,11 +82,13 @@ func parseRangeHeader(ctx context.Context, req *http.Request) (start, end *int, 
 func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[string]string) {
 	ctx := req.Context()
 
-	beatID, err := strconv.Atoi(params["id"])
-	if err != nil || beatID < 1 {
-		logger.Log().Error(ctx, model.ErrInvalidBeatID.Error())
-		http.Error(w, model.ErrInvalidBeatID.Error(), http.StatusBadRequest)
+	data := params["id"]
+	if err := uuid.Validate(data); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+
+	beatID := uuid.MustParse(data)
 
 	s, e, err := parseRangeHeader(ctx, req)
 	if err != nil {
@@ -131,8 +132,56 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 		w.WriteHeader(http.StatusOK)
 	}
 
-	if err = r.beatStreamer.StreamBeat(ctx, beat, w, r.chunkSize); err != nil {
+	if _, err = io.Copy(w, beat); err != nil {
 		logger.Log().Error(ctx, err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func parseUploadParams(ctx context.Context, req *http.Request) (*model.MediaMeta, error) {
+	t := req.URL.Query().Get("type")
+	if t != "file" && t != "archive" && t != "image" {
+		logger.Log().Debug(ctx, model.ErrInvalidType.Error())
+		return nil, &model.ModelError{Err: model.ErrInvalidType}
+	}
+
+	exp, err := strconv.Atoi(req.URL.Query().Get("exp"))
+	if err != nil {
+		logger.Log().Debug(ctx, err.Error())
+		return nil, err
+	}
+
+	return &model.MediaMeta{
+		MediaType:     model.MediaType(t),
+		ContentType:   req.Header.Get("Content-Type"),
+		ContentLength: req.ContentLength,
+		Name:          req.URL.Query().Get("name"),
+		Expiry:        int64(exp),
+		URL:           req.URL.String(),
+	}, nil
+}
+
+func (r *Router) upload(w http.ResponseWriter, req *http.Request, params map[string]string) {
+	ctx := req.Context()
+
+	m, err := parseUploadParams(ctx, req)
+	if err != nil {
+		logger.Log().Debug(ctx, err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	defer req.Body.Close()
+
+	if err := r.mediaUploader.UploadMedia(ctx, req.Body, *m); err != nil {
+		logger.Log().Error(ctx, err.Error())
+		var modelErr *model.ModelError
+		if errors.As(err, &modelErr) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

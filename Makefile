@@ -29,16 +29,16 @@ coverage: ### generate coverage report
 	go test ${TEST_FLAGS} -coverprofile=coverage.out ./...
 	go tool cover -html="coverage.out"
 
-MIGRATION_NAME=composite_beats_view
+MIGRATION_NAME=initial
 
 migrate-new: ### create a new migration
-	migrate create -ext sql -dir ./internal/data -seq ${MIGRATION_NAME}
+	migrate create -ext sql -dir ./internal/db/migrations -seq ${MIGRATION_NAME}
 
 migrate-up: ### apply all migrations
-	migrate -path ./internal/data -database '$(PG_URL)?sslmode=disable' up
+	migrate -path ./internal/db/migrations -database '$(PG_URL)?sslmode=disable' up
 
 migrate-down: ### migration down
-	migrate -path ./internal/data -database '$(PG_URL)?sslmode=disable' down
+	migrate -path ./internal/db/migrations -database '$(PG_URL)?sslmode=disable' down
 
 mock:
 	mockery

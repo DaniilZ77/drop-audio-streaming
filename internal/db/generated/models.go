@@ -8,64 +8,69 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Scale string
+type NoteScale string
 
 const (
-	ScaleMajor Scale = "major"
-	ScaleMinor Scale = "minor"
+	NoteScaleMajor NoteScale = "major"
+	NoteScaleMinor NoteScale = "minor"
 )
 
-func (e *Scale) Scan(src interface{}) error {
+func (e *NoteScale) Scan(src interface{}) error {
 	switch s := src.(type) {
 	case []byte:
-		*e = Scale(s)
+		*e = NoteScale(s)
 	case string:
-		*e = Scale(s)
+		*e = NoteScale(s)
 	default:
-		return fmt.Errorf("unsupported scan type for Scale: %T", src)
+		return fmt.Errorf("unsupported scan type for NoteScale: %T", src)
 	}
 	return nil
 }
 
-type NullScale struct {
-	Scale Scale
-	Valid bool // Valid is true if Scale is not NULL
+type NullNoteScale struct {
+	NoteScale NoteScale
+	Valid     bool // Valid is true if NoteScale is not NULL
 }
 
 // Scan implements the Scanner interface.
-func (ns *NullScale) Scan(value interface{}) error {
+func (ns *NullNoteScale) Scan(value interface{}) error {
 	if value == nil {
-		ns.Scale, ns.Valid = "", false
+		ns.NoteScale, ns.Valid = "", false
 		return nil
 	}
 	ns.Valid = true
-	return ns.Scale.Scan(value)
+	return ns.NoteScale.Scan(value)
 }
 
 // Value implements the driver Valuer interface.
-func (ns NullScale) Value() (driver.Value, error) {
+func (ns NullNoteScale) Value() (driver.Value, error) {
 	if !ns.Valid {
 		return nil, nil
 	}
-	return string(ns.Scale), nil
+	return string(ns.NoteScale), nil
 }
 
 type Beat struct {
-	ID                int32
-	BeatmakerID       int32
-	FilePath          string
-	ImagePath         string
-	Name              string
-	Description       string
-	IsFileDownloaded  bool
-	IsImageDownloaded bool
-	IsDeleted         bool
-	CreatedAt         pgtype.Timestamp
-	UpdatedAt         pgtype.Timestamp
-	Bpm               int32
+	ID                  uuid.UUID
+	BeatmakerID         uuid.UUID
+	FilePath            string
+	ImagePath           string
+	ArchivePath         string
+	Name                string
+	Description         string
+	IsFileDownloaded    bool
+	IsImageDownloaded   bool
+	IsArchiveDownloaded bool
+	RangeStart          int64
+	RangeEnd            int64
+	IsDeleted           bool
+	CreatedAt           pgtype.Timestamp
+	UpdatedAt           pgtype.Timestamp
+	Bpm                 int32
 }
 
 type BeatsEvent struct {
@@ -74,46 +79,51 @@ type BeatsEvent struct {
 }
 
 type BeatsGenre struct {
-	ID      int32
-	BeatID  int32
-	GenreID int32
+	ID      uuid.UUID
+	BeatID  uuid.UUID
+	GenreID uuid.UUID
 }
 
 type BeatsMood struct {
-	ID     int32
-	BeatID int32
-	MoodID int32
+	ID     uuid.UUID
+	BeatID uuid.UUID
+	MoodID uuid.UUID
 }
 
 type BeatsNote struct {
-	ID     int32
-	BeatID int32
-	NoteID int32
-	Scale  Scale
+	ID     uuid.UUID
+	BeatID uuid.UUID
+	NoteID uuid.UUID
+	Scale  NoteScale
+}
+
+type BeatsOwner struct {
+	BeatID uuid.UUID
+	UserID uuid.UUID
 }
 
 type BeatsTag struct {
-	ID     int32
-	BeatID int32
-	TagID  int32
+	ID     uuid.UUID
+	BeatID uuid.UUID
+	TagID  uuid.UUID
 }
 
 type Genre struct {
-	ID   int32
+	ID   uuid.UUID
 	Name string
 }
 
 type Mood struct {
-	ID   int32
+	ID   uuid.UUID
 	Name string
 }
 
 type Note struct {
-	ID   int32
+	ID   uuid.UUID
 	Name string
 }
 
 type Tag struct {
-	ID   int32
+	ID   uuid.UUID
 	Name string
 }

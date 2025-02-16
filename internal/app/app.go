@@ -48,7 +48,8 @@ func New(ctx context.Context, cfg *config.Config) *App {
 	beatStore := beatstore.New(mio, pg, cfg.DB.MinioBucket)
 
 	// Service
-	beatService := beat.New(beatStore, beatStore, beatStore, beatStore)
+	beatServiceConfig := beat.NewBeatServiceConfig(cfg.FileSizeLimit, cfg.ArchiveSizeLimit, cfg.ImageSizeLimit, cfg.VerificationSecret, cfg.URLTTL)
+	beatService := beat.NewBeatService(beatStore, beatStore, beatStore, beatStore, beatStore, beatServiceConfig)
 
 	// gRPC client
 	gRPCUserClient, err := userclient.New(
