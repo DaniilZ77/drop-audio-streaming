@@ -45,7 +45,7 @@ func (s *BeatStore) SaveBeat(ctx context.Context, beat model.SaveBeatParams) (er
 		return err
 	}
 
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) // nolint
 
 	qtx := s.Queries.WithTx(tx)
 
@@ -301,7 +301,7 @@ func (s *BeatStore) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeatP
 		return nil, err
 	}
 
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) // nolint
 
 	qtx := s.Queries.WithTx(tx)
 	beat := new(generated.Beat)
@@ -403,7 +403,7 @@ func (s *BeatStore) SaveOwner(ctx context.Context, owner generated.SaveOwnerPara
 		return err
 	}
 
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) // nolint
 
 	qtx := s.Queries.WithTx(tx)
 	if err := qtx.DeleteBeat(ctx, owner.BeatID); err != nil {
