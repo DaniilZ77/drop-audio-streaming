@@ -2,9 +2,10 @@ package postgres
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
+	sl "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	_ "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -16,14 +17,14 @@ const (
 )
 
 type Postgres struct {
-	maxPoolSize  int
-	connAttempts int
+	maxPoolSize  int32
+	connAttempts int32
 	connTimeout  time.Duration
 
 	DB *pgxpool.Pool
 }
 
-func New(ctx context.Context, dbURL string, opts ...Option) (*Postgres, error) {
+func New(ctx context.Context, dbURL string, log *slog.Logger, opts ...Option) (*Postgres, error) {
 	pg := &Postgres{
 		maxPoolSize:  _defaultMaxPoolSize,
 		connAttempts: _defaultConnAttempts,
@@ -40,17 +41,19 @@ func New(ctx context.Context, dbURL string, opts ...Option) (*Postgres, error) {
 
 	for pg.connAttempts > 0 {
 		db, err = pgxpool.New(ctx, dbURL)
-		if err == nil && db.Ping(ctx) == nil {
-			db.Config().MaxConns = int32(pg.maxPoolSize)
+		if err != nil {
+			continue
+		}
+
+		if err = db.Ping(ctx); err == nil {
+			db.Config().MaxConns = pg.maxPoolSize
 			db.Config().MaxConnLifetime = time.Hour
 
 			pg.DB = db
 			break
 		}
 
-		logger.Log().Debug(ctx,
-			"postgres is trying to connect, attempts left: %d", pg.connAttempts,
-		)
+		log.Debug("postgres is trying to connect", slog.Any("attempts left", pg.connAttempts))
 
 		time.Sleep(pg.connTimeout)
 
@@ -58,7 +61,7 @@ func New(ctx context.Context, dbURL string, opts ...Option) (*Postgres, error) {
 	}
 
 	if err != nil {
-		logger.Log().Fatal(ctx, "failed to connect to database: %s", err.Error())
+		log.Error("failed to connect to database", sl.Err(err))
 		return nil, err
 	}
 

@@ -8,17 +8,16 @@ import (
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/app"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/config"
+	sl "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 )
 
 func main() {
-	cfg, err := config.NewConfig()
-	if err != nil {
-		panic("failed to load config: " + err.Error())
-	}
+	cfg := config.MustLoad()
 
 	ctx := context.Background()
+	log := sl.New(cfg.Env)
 
-	application := app.New(ctx, cfg)
+	application := app.New(ctx, cfg, log)
 
 	// Closing DBs
 	defer application.Pg.Close(ctx)

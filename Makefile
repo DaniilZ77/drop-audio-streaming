@@ -9,12 +9,7 @@ BUILD_FLAGS=
 PG_URL=postgres://postgres:postgres@localhost:5432/drop-audiostreaming
 
 run: ### run app
-	go run cmd/audiostreaming/main.go -db_url '$(PG_URL)' \
-	-grpc_port localhost:50052 -grpc_user_client_addr localhost:50051 -http_port localhost:8081 -log_level debug -cert ./tls/cert.pem \
-	-key ./tls/key.pem -minio_password minioadmin -minio_user minioadmin \
-	-minio_endpoint 127.0.0.1:9000 -minio_bucket drop-audio \
-	-minio_use_ssl false -minio_location us-east-1 \
-	-chunk_size 1024 -grpc_client_retries 1 -grpc_client_timeout 2s
+	CONFIG_PATH=./config/local.yaml go run cmd/audiostreaming/main.go
 
 build: ### build app
 	go build ${BUILD_FLAGS} -o ${SERVICE_NAME} cmd/audiostreaming/main.go
@@ -39,6 +34,3 @@ migrate-up: ### apply all migrations
 
 migrate-down: ### migration down
 	migrate -path ./internal/db/migrations -database '$(PG_URL)?sslmode=disable' down
-
-mock:
-	mockery

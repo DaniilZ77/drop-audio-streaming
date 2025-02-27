@@ -2,12 +2,12 @@ package app
 
 import (
 	"context"
+	"log/slog"
 
 	grpcapp "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/app/grpc"
 	httpapp "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/app/http"
 	client "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/client"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/config"
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/minio"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/postgres"
 	beat "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/service"
@@ -21,53 +21,64 @@ type App struct {
 	Mio        *minio.Minio
 }
 
-func New(ctx context.Context, cfg *config.Config) *App {
-	// Init logger
-	logger.New(cfg.Log.Level)
-
+func New(ctx context.Context,
+	cfg *config.Config,
+	log *slog.Logger) *App {
 	// Postgres connection
-	pg, err := postgres.New(ctx, cfg.DB.URL)
+	pg, err := postgres.New(ctx, cfg.DatabaseURL, log)
 	if err != nil {
-		logger.Log().Fatal(ctx, "error with connection to database: %s", err.Error())
-		return nil
+		panic(err)
 	}
 
 	// Minio connection
 	mio, err := minio.New(ctx, minio.MinioConfig{
-		Password: cfg.DB.MinioPassword,
-		User:     cfg.DB.MinioUser,
-		Endpoint: cfg.DB.MinioEndpoint,
-		Bucket:   cfg.DB.MinioBucket,
-	})
+		Password: cfg.Minio.Password,
+		User:     cfg.Minio.User,
+		Endpoint: cfg.Minio.Url,
+		Bucket:   cfg.Minio.Bucket,
+	}, log)
 	if err != nil {
-		logger.Log().Fatal(ctx, "error with connection to minio: %s", err.Error())
-		return nil
+		panic(err)
 	}
 
 	// Store
-	beatStore := beatstore.New(mio, pg, cfg.DB.MinioBucket)
+	beatStore := beatstore.New(mio, pg, cfg.Minio.Bucket, log)
 
 	// Service
-	beatServiceConfig := beat.NewBeatServiceConfig(cfg.FileSizeLimit, cfg.ArchiveSizeLimit, cfg.ImageSizeLimit, cfg.VerificationSecret, cfg.URLTTL)
-	beatService := beat.NewBeatService(beatStore, beatStore, beatStore, beatStore, beatStore, beatServiceConfig)
+	beatServiceConfig := beat.NewBeatServiceConfig(
+		cfg.FileSizeLimit,
+		cfg.ArchiveSizeLimit,
+		cfg.ImageSizeLimit,
+		cfg.VerificationSecret,
+		cfg.UrlTtl)
+	beatService := beat.NewBeatService(
+		beatStore,
+		beatStore,
+		beatStore,
+		beatStore,
+		beatStore,
+		beatServiceConfig,
+		log)
 
 	// gRPC client
-	gRPCUserClient, err := client.NewUserClient(
-		ctx,
-		cfg.GRPCUserClientAddr,
-		cfg.GRPCClientTimeout,
-		cfg.GRPCClientRetries,
-	)
+	gRPCUserClient, err := client.NewUserClient(ctx,
+		cfg.GrpcClient.Port,
+		cfg.GrpcClient.Timeout,
+		cfg.GrpcClient.Retries,
+		log)
 	if err != nil {
-		logger.Log().Fatal(ctx, "error with connection to user grpc server: %s", err.Error())
-		return nil
+		panic(err)
+	}
+
+	if err := gRPCUserClient.Health(ctx); err != nil {
+		panic(err)
 	}
 
 	// gRPC server
-	gRPCApp := grpcapp.New(ctx, cfg, beatService, gRPCUserClient)
+	gRPCApp := grpcapp.New(ctx, cfg, beatService, gRPCUserClient, log)
 
 	// HTTP server
-	httpApp := httpapp.New(ctx, cfg, beatService, gRPCUserClient)
+	httpApp := httpapp.New(ctx, cfg, beatService, gRPCUserClient, log)
 
 	return &App{
 		GRPCServer: gRPCApp,

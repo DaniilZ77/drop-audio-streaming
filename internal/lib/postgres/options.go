@@ -6,14 +6,14 @@ import "time"
 type Option func(*Postgres)
 
 // MaxPoolSize -.
-func MaxPoolSize(size int) Option {
+func MaxPoolSize(size int32) Option {
 	return func(c *Postgres) {
 		c.maxPoolSize = size
 	}
 }
 
 // ConnAttempts -.
-func ConnAttempts(attempts int) Option {
+func ConnAttempts(attempts int32) Option {
 	return func(c *Postgres) {
 		c.connAttempts = attempts
 	}

@@ -3,11 +3,12 @@ package grpc
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	audiov1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio"
 	userv1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/user"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
+	sl "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/google/uuid"
@@ -23,7 +24,7 @@ type BeatModifier interface {
 }
 
 type BeatProvider interface {
-	GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total *int, err error)
+	GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total *uint64, err error)
 	GetBeatParams(ctx context.Context) (params *model.BeatParams, err error)
 }
 
@@ -41,6 +42,7 @@ type server struct {
 	beatProvider BeatProvider
 	urlProvider  URLProvider
 	userProvider UserProvider
+	log          *slog.Logger
 }
 
 func Register(
@@ -48,14 +50,15 @@ func Register(
 	beatSaver BeatModifier,
 	beatProvider BeatProvider,
 	urlProvider URLProvider,
-	userProvider UserProvider) {
-	audiov1.RegisterBeatServiceServer(gRPCServer, &server{beatModifier: beatSaver, beatProvider: beatProvider, urlProvider: urlProvider, userProvider: userProvider})
+	userProvider UserProvider,
+	log *slog.Logger) {
+	audiov1.RegisterBeatServiceServer(gRPCServer, &server{beatModifier: beatSaver, beatProvider: beatProvider, urlProvider: urlProvider, userProvider: userProvider, log: log})
 }
 
 func (s *server) GetBeatParams(ctx context.Context, req *audiov1.GetBeatParamsRequest) (*audiov1.GetBeatParamsResponse, error) {
 	beat, err := s.beatProvider.GetBeatParams(ctx)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("internal error", sl.Err(err))
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -64,17 +67,17 @@ func (s *server) GetBeatParams(ctx context.Context, req *audiov1.GetBeatParamsRe
 
 func (s *server) GetBeats(ctx context.Context, req *audiov1.GetBeatsRequest) (*audiov1.GetBeatsResponse, error) {
 	if err := protovalidate.Validate(req); err != nil {
-		logger.Log().Debug(ctx, err.Error())
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	params := model.ToModelGetBeatsParams(req)
-	beats, total, err := s.beatProvider.GetBeats(ctx, params)
+	params, err := model.ToModelGetBeatsParams(req)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		if errors.Is(err, model.ErrOrderByInvalidField) {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
-		}
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	beats, total, err := s.beatProvider.GetBeats(ctx, *params)
+	if err != nil {
+		s.log.Error("internal error", sl.Err(err))
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -82,31 +85,34 @@ func (s *server) GetBeats(ctx context.Context, req *audiov1.GetBeatsRequest) (*a
 	for i := range beats {
 		user, err := s.userProvider.GetUser(ctx, beats[i].BeatmakerID)
 		if err != nil {
-			logger.Log().Error(ctx, err.Error())
+			s.log.Error("internal error", sl.Err(err))
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		users = append(users, user)
 	}
 
-	return model.ToGetBeatsResponse(beats, users, *total, params), nil
+	return model.ToGetBeatsResponse(beats, users, *total, *params), nil
 }
 
 func (s *server) UploadBeat(ctx context.Context, req *audiov1.UploadBeatRequest) (*audiov1.UploadBeatResponse, error) {
 	if err := protovalidate.Validate(req); err != nil {
-		logger.Log().Debug(ctx, err.Error())
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	beat := model.ToModelSaveBeatParams(req)
-	fileUploadURL, imageUploadURL, archiveUploadURL, err := s.beatModifier.SaveBeat(ctx, beat)
+	beat, err := model.ToModelSaveBeatParams(req)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	fileUploadURL, imageUploadURL, archiveUploadURL, err := s.beatModifier.SaveBeat(ctx, *beat)
+	if err != nil {
 		var modelErr *model.ModelError
 		if errors.Is(err, model.ErrBeatAlreadyExists) {
 			return nil, status.Error(codes.AlreadyExists, err.Error())
 		} else if errors.As(err, &modelErr) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
+		s.log.Error("internal error", sl.Err(err))
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -119,12 +125,16 @@ func (s *server) UploadBeat(ctx context.Context, req *audiov1.UploadBeatRequest)
 
 func (s *server) DeleteBeat(ctx context.Context, req *audiov1.DeleteBeatRequest) (*audiov1.DeleteBeatResponse, error) {
 	if err := protovalidate.Validate(req); err != nil {
-		logger.Log().Debug(ctx, err.Error())
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	if err := s.beatModifier.DeleteBeat(ctx, uuid.MustParse(req.BeatId)); err != nil {
-		logger.Log().Error(ctx, err.Error())
+	beatID, err := uuid.Parse(req.BeatId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "beat id must be uuid")
+	}
+
+	if err := s.beatModifier.DeleteBeat(ctx, beatID); err != nil {
+		s.log.Error("internal error", sl.Err(err))
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -133,20 +143,23 @@ func (s *server) DeleteBeat(ctx context.Context, req *audiov1.DeleteBeatRequest)
 
 func (s *server) UpdateBeat(ctx context.Context, req *audiov1.UpdateBeatRequest) (*audiov1.UpdateBeatResponse, error) {
 	if err := protovalidate.Validate(req); err != nil {
-		logger.Log().Debug(ctx, err.Error())
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	params := model.ToModelUpdateBeatParams(req)
-	fileUploadURL, imageUploadURL, archiveUploadURL, err := s.beatModifier.UpdateBeat(ctx, params)
+	params, err := model.ToModelUpdateBeatParams(req)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	fileUploadURL, imageUploadURL, archiveUploadURL, err := s.beatModifier.UpdateBeat(ctx, *params)
+	if err != nil {
 		var modelErr *model.ModelError
 		if errors.Is(err, model.ErrBeatNotFound) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		} else if errors.As(err, &modelErr) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
+		s.log.Error("internal error", sl.Err(err))
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -159,20 +172,23 @@ func (s *server) UpdateBeat(ctx context.Context, req *audiov1.UpdateBeatRequest)
 
 func (s *server) AcquireBeat(ctx context.Context, req *audiov1.AcquireBeatRequest) (*audiov1.AcquireBeatResponse, error) {
 	if err := protovalidate.Validate(req); err != nil {
-		logger.Log().Debug(ctx, err.Error())
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	params := model.ToModelGetArchiveParams(req)
-	url, err := s.urlProvider.GetBeatArchive(ctx, params)
+	params, err := model.ToModelGetArchiveParams(req)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	url, err := s.urlProvider.GetBeatArchive(ctx, *params)
+	if err != nil {
 		var modelErr *model.ModelError
 		if errors.Is(err, model.ErrArchiveNotFound) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		} else if errors.As(err, &modelErr) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
+		s.log.Error("internal error", sl.Err(err))
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 

@@ -2,9 +2,10 @@ package minio
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
+	sl "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
@@ -30,7 +31,7 @@ type Minio struct {
 	Client *minio.Client
 }
 
-func New(ctx context.Context, config MinioConfig, opts ...Option) (*Minio, error) {
+func New(ctx context.Context, config MinioConfig, log *slog.Logger, opts ...Option) (*Minio, error) {
 	m := &Minio{
 		connAttempts: _defaultConnAttempts,
 		connTimeout:  _defaultConnTimeout,
@@ -47,7 +48,7 @@ func New(ctx context.Context, config MinioConfig, opts ...Option) (*Minio, error
 		Secure: config.UseSSL,
 	})
 	if err != nil {
-		logger.Log().Fatal(ctx, "failed to init minio client: %s", err.Error())
+		log.Error("failed to init minio client", sl.Err(err))
 		return nil, err
 	}
 
@@ -61,21 +62,21 @@ func New(ctx context.Context, config MinioConfig, opts ...Option) (*Minio, error
 			break
 		}
 
-		logger.Log().Debug(ctx, "minio failed to check bucket: %s; attempts left: %d", err.Error(), m.connAttempts)
+		log.Debug("minio failed to check bucket", slog.Int("attempts left", m.connAttempts), sl.Err(err))
 
 		time.Sleep(m.connTimeout)
 
 		m.connAttempts--
 	}
 	if err != nil {
-		logger.Log().Fatal(ctx, "failed to connect to minio: %s", err.Error())
+		log.Error("failed to connect to minio", sl.Err(err))
 		return nil, err
 	}
 
 	if !exists {
 		err = m.Client.MakeBucket(ctx, config.Bucket, minio.MakeBucketOptions{Region: config.Location})
 		if err != nil {
-			logger.Log().Fatal(ctx, "failed to create bucket: %s", err.Error())
+			log.Error("failed to create bucket", sl.Err(err))
 			return nil, err
 		}
 	}

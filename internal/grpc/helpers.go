@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
 	"github.com/golang-jwt/jwt"
 	"google.golang.org/grpc"
@@ -22,25 +21,21 @@ func AuthMiddleware(secret string, requireAdmin map[string]bool) grpc.UnaryServe
 
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok || len(md.Get("authorization")) == 0 {
-			logger.Log().Debug(ctx, "token not provided")
 			return nil, status.Errorf(codes.Unauthenticated, "%s: %s", model.ErrUnauthorized.Error(), "token not provided")
 		}
 
 		data := strings.Fields(md.Get("authorization")[0])
 		if len(data) < 2 || strings.ToLower(data[0]) != "bearer" {
-			logger.Log().Debug(ctx, "invalid header format")
 			return nil, status.Errorf(codes.Unauthenticated, "%s: %s", model.ErrUnauthorized.Error(), "invalid header format")
 		}
 
 		token := data[1]
-		admin, err := validateToken(ctx, token, secret)
+		admin, err := validateToken(token, secret)
 		if err != nil {
-			logger.Log().Debug(ctx, err.Error())
 			return nil, status.Errorf(codes.Unauthenticated, "%s: %s", model.ErrUnauthorized.Error(), err.Error())
 		}
 
 		if model.AdminScale(*admin) != model.AdminScaleMinor && model.AdminScale(*admin) != model.AdminScaleMajor {
-			logger.Log().Debug(ctx, model.ErrUnauthorized.Error())
 			return nil, status.Errorf(codes.PermissionDenied, "%s: %s", model.ErrUnauthorized, "must be admin")
 		}
 
@@ -48,17 +43,15 @@ func AuthMiddleware(secret string, requireAdmin map[string]bool) grpc.UnaryServe
 	}
 }
 
-func validateToken(ctx context.Context, token, secret string) (*string, error) {
+func validateToken(token, secret string) (*string, error) {
 	data, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			logger.Log().Error(ctx, "unexpected signing method")
 			return nil, fmt.Errorf("%w: %s", model.ErrUnauthorized, "unexpected signing method")
 		}
 
 		return []byte(secret), nil
 	})
 	if err != nil {
-		logger.Log().Debug(ctx, err.Error())
 		return nil, fmt.Errorf("%w: %w", model.ErrUnauthorized, err)
 	}
 

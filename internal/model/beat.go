@@ -1,7 +1,6 @@
 package model
 
 import (
-	"strings"
 	"time"
 
 	audiov1 "github.com/MAXXXIMUS-tropical-milkshake/beatflow-protos/gen/go/audio"
@@ -15,7 +14,6 @@ type (
 	Beat struct {
 		ID                  uuid.UUID
 		BeatmakerID         uuid.UUID
-		FilePath            string
 		ImagePath           string
 		Name                string
 		Description         string
@@ -23,8 +21,8 @@ type (
 		IsImageDownloaded   bool
 		IsArchiveDownloaded bool
 		Bpm                 int
-		RangeStart          int
-		RangeEnd            int
+		RangeStart          int64
+		RangeEnd            int64
 		CreatedAt           time.Time
 		Genres              []string
 		Tags                []string
@@ -53,8 +51,8 @@ type (
 		BeatName     *string
 		Bpm          *int
 		OrderBy      *OrderBy
-		Limit        int
-		Offset       int
+		Limit        uint64
+		Offset       uint64
 		IsDownloaded *bool
 	}
 
@@ -86,53 +84,78 @@ type (
 	AdminScale string
 
 	MediaMeta struct {
-		MediaType     MediaType
-		ContentType   string
-		ContentLength int64
-		Name          string
-		Expiry        int64
-		URL           string
+		MediaType         MediaType
+		HttpContentType   string
+		HttpContentLength int64
+		Name              string
+		Expiry            int64
+		UploadURL         string
 	}
 )
 
 const (
-	AdminScaleMinor AdminScale = "minor"
-	AdminScaleMajor AdminScale = "major"
-	File            MediaType  = "file"
-	Archive         MediaType  = "archive"
-	Image           MediaType  = "image"
+	MediaTypeFile    MediaType  = "file"
+	MediaTypeArchive MediaType  = "archive"
+	MediaTypeImage   MediaType  = "image"
+	AdminScaleMinor  AdminScale = "minor"
+	AdminScaleMajor  AdminScale = "major"
 )
 
-func ToModelSaveBeatParams(beat *audiov1.UploadBeatRequest) SaveBeatParams {
+func ToModelSaveBeatParams(beat *audiov1.UploadBeatRequest) (*SaveBeatParams, error) {
 	genres := make([]generated.SaveGenresParams, 0, len(beat.BeatGenre))
 	tags := make([]generated.SaveTagsParams, 0, len(beat.BeatTag))
 	moods := make([]generated.SaveMoodsParams, 0, len(beat.BeatMood))
 
+	beatID, err := uuid.Parse(beat.BeatId)
+	if err != nil {
+		return nil, NewErr(ErrInvalidID, "beat id must be uuid")
+	}
+
+	noteID, err := uuid.Parse(beat.Note.NoteId)
+	if err != nil {
+		return nil, NewErr(ErrInvalidID, "note id must be uuid")
+	}
+
+	beatmakerID, err := uuid.Parse(beat.BeatmakerId)
+	if err != nil {
+		return nil, NewErr(ErrInvalidID, "beatmaker id must be uuid")
+	}
+
+	var id uuid.UUID
 	for _, v := range beat.BeatGenre {
+		if id, err = uuid.Parse(v); err != nil {
+			return nil, NewErr(ErrInvalidID, "genre id must be uuid")
+		}
 		genres = append(genres, generated.SaveGenresParams{
-			GenreID: uuid.MustParse(v),
-			BeatID:  uuid.MustParse(beat.BeatId),
+			GenreID: id,
+			BeatID:  beatID,
 		})
 	}
 
 	for _, v := range beat.BeatTag {
+		if id, err = uuid.Parse(v); err != nil {
+			return nil, NewErr(ErrInvalidID, "tag id must be uuid")
+		}
 		tags = append(tags, generated.SaveTagsParams{
-			TagID:  uuid.MustParse(v),
-			BeatID: uuid.MustParse(beat.BeatId),
+			TagID:  id,
+			BeatID: beatID,
 		})
 	}
 
 	for _, v := range beat.BeatMood {
+		if id, err = uuid.Parse(v); err != nil {
+			return nil, NewErr(ErrInvalidID, "mood id must be uuid")
+		}
 		moods = append(moods, generated.SaveMoodsParams{
-			MoodID: uuid.MustParse(v),
-			BeatID: uuid.MustParse(beat.BeatId),
+			MoodID: id,
+			BeatID: beatID,
 		})
 	}
 
-	return SaveBeatParams{
+	return &SaveBeatParams{
 		SaveBeatParams: generated.SaveBeatParams{
-			ID:          uuid.MustParse(beat.BeatId),
-			BeatmakerID: uuid.MustParse(beat.BeatmakerId),
+			ID:          beatID,
+			BeatmakerID: beatmakerID,
 			Name:        beat.Name,
 			Description: beat.Description,
 			Bpm:         int32(beat.Bpm),
@@ -143,18 +166,23 @@ func ToModelSaveBeatParams(beat *audiov1.UploadBeatRequest) SaveBeatParams {
 		Tags:   tags,
 		Moods:  moods,
 		Note: generated.SaveNoteParams{
-			BeatID: uuid.MustParse(beat.BeatId),
-			NoteID: uuid.MustParse(beat.Note.NoteId),
-			Scale:  generated.NoteScale(strings.ToLower(beat.Note.Scale.String())),
+			BeatID: beatID,
+			NoteID: noteID,
+			Scale:  generated.NoteScale(beat.Note.Scale),
 		},
-	}
+	}, nil
 }
 
-func ToModelGetBeatsParams(params *audiov1.GetBeatsRequest) GetBeatsParams {
+func ToModelGetBeatsParams(params *audiov1.GetBeatsRequest) (*GetBeatsParams, error) {
 	var res GetBeatsParams
 
+	var id uuid.UUID
+	var err error
 	if params.BeatId != nil {
-		beatID := uuid.MustParse(*params.BeatId)
+		if id, err = uuid.Parse(*params.BeatId); err != nil {
+			return nil, NewErr(ErrInvalidID, "beat id must be uuid")
+		}
+		beatID := id
 		res.BeatID = &beatID
 	}
 
@@ -165,12 +193,15 @@ func ToModelGetBeatsParams(params *audiov1.GetBeatsRequest) GetBeatsParams {
 	if params.Note != nil {
 		res.Note = &GetBeatsNote{
 			Name:  params.Note.Name,
-			Scale: strings.ToLower(params.Note.Scale.String()),
+			Scale: params.Note.Scale,
 		}
 	}
 
 	if params.BeatmakerId != nil {
-		beatmakerID := uuid.MustParse(*params.BeatmakerId)
+		if id, err = uuid.Parse(*params.BeatmakerId); err != nil {
+			return nil, NewErr(ErrInvalidID, "beatmaker id must be uuid")
+		}
+		beatmakerID := id
 		res.BeatmakerID = &beatmakerID
 	}
 
@@ -183,20 +214,20 @@ func ToModelGetBeatsParams(params *audiov1.GetBeatsRequest) GetBeatsParams {
 
 	if params.OrderBy != nil {
 		res.OrderBy = &OrderBy{
-			Order: params.OrderBy.Order.String(),
+			Order: params.OrderBy.Order,
 			Field: params.OrderBy.Field,
 		}
 	}
 
-	res.Limit = int(params.Limit)
-	res.Offset = int(params.Offset)
+	res.Limit = params.Limit
+	res.Offset = params.Offset
 
 	res.IsDownloaded = params.IsDownloaded
 
-	return res
+	return &res, nil
 }
 
-func ToGetBeatsResponse(beats []Beat, users []*userv1.GetUserResponse, total int, params GetBeatsParams) *audiov1.GetBeatsResponse {
+func ToGetBeatsResponse(beats []Beat, users []*userv1.GetUserResponse, total uint64, params GetBeatsParams) *audiov1.GetBeatsResponse {
 	var res []*audiov1.Beat
 	for i := range beats {
 		res = append(res, toResponseBeat(beats[i], users[i]))
@@ -205,19 +236,18 @@ func ToGetBeatsResponse(beats []Beat, users []*userv1.GetUserResponse, total int
 	return &audiov1.GetBeatsResponse{
 		Beats: res,
 		Pagination: &audiov1.Pagination{
-			Records:        int64(total),
-			RecordsPerPage: int64(params.Limit),
-			Pages:          (int64(total) + int64(params.Limit) - 1) / int64(params.Limit),
-			CurPage:        int64(params.Offset)/int64(params.Limit) + 1,
+			Records:        total,
+			RecordsPerPage: params.Limit,
+			Pages:          (total + params.Limit - 1) / params.Limit,
+			CurPage:        params.Offset/params.Limit + 1,
 		},
 	}
 }
 
 func toResponseBeat(b Beat, u *userv1.GetUserResponse) *audiov1.Beat {
-	scale := audiov1.Scale_MINOR
-	major := strings.ToLower(audiov1.Scale_name[int32(audiov1.Scale_MAJOR)])
-	if b.NoteScale != nil && *b.NoteScale == major {
-		scale = audiov1.Scale_MAJOR
+	scale := generated.NoteScaleMinor
+	if b.NoteScale != nil && *b.NoteScale == string(generated.NoteScaleMajor) {
+		scale = generated.NoteScaleMajor
 	}
 
 	var name string
@@ -240,12 +270,12 @@ func toResponseBeat(b Beat, u *userv1.GetUserResponse) *audiov1.Beat {
 		Mood:             b.Moods,
 		Note: &audiov1.GetBeatsNote{
 			Name:  name,
-			Scale: scale,
+			Scale: string(scale),
 		},
 		Bpm: int64(b.Bpm),
 		Range: &audiov1.Range{
-			Start: int64(b.RangeStart),
-			End:   int64(b.RangeEnd),
+			Start: b.RangeStart,
+			End:   b.RangeEnd,
 		},
 		IsFileUploaded:    b.IsFileDownloaded,
 		IsImageUploaded:   b.IsImageDownloaded,
@@ -296,38 +326,56 @@ func ToGetBeatParamsResponse(b BeatParams) *audiov1.GetBeatParamsResponse {
 	}
 }
 
-func ToModelUpdateBeatParams(req *audiov1.UpdateBeatRequest) UpdateBeatParams {
+func ToModelUpdateBeatParams(req *audiov1.UpdateBeatRequest) (*UpdateBeatParams, error) {
 	var genres []generated.SaveGenresParams
 	var tags []generated.SaveTagsParams
 	var moods []generated.SaveMoodsParams
 
+	beatID, err := uuid.Parse(req.BeatId)
+	if err != nil {
+		return nil, NewErr(ErrInvalidID, "beat id must be uuid")
+	}
+
+	var id uuid.UUID
 	for _, v := range req.BeatGenre {
+		if id, err = uuid.Parse(v); err != nil {
+			return nil, NewErr(ErrInvalidID, "genre id must be uuid")
+		}
 		genres = append(genres, generated.SaveGenresParams{
-			GenreID: uuid.MustParse(v),
-			BeatID:  uuid.MustParse(req.BeatId),
+			GenreID: id,
+			BeatID:  beatID,
 		})
 	}
 
 	for _, v := range req.BeatTag {
+		if id, err = uuid.Parse(v); err != nil {
+			return nil, NewErr(ErrInvalidID, "tag id must be uuid")
+		}
 		tags = append(tags, generated.SaveTagsParams{
-			TagID:  uuid.MustParse(v),
-			BeatID: uuid.MustParse(req.BeatId),
+			TagID:  id,
+			BeatID: beatID,
 		})
 	}
 
 	for _, v := range req.BeatMood {
+		if id, err = uuid.Parse(v); err != nil {
+			return nil, NewErr(ErrInvalidID, "mood id must be uuid")
+		}
 		moods = append(moods, generated.SaveMoodsParams{
-			MoodID: uuid.MustParse(v),
-			BeatID: uuid.MustParse(req.BeatId),
+			MoodID: id,
+			BeatID: beatID,
 		})
 	}
 
 	var note *generated.SaveNoteParams
 	if req.Note != nil {
+		if id, err = uuid.Parse(req.Note.NoteId); err != nil {
+			return nil, NewErr(ErrInvalidID, "note id must be uuid")
+		}
 		note = &generated.SaveNoteParams{
-			BeatID: uuid.MustParse(req.BeatId),
-			NoteID: uuid.MustParse(req.Note.NoteId),
-			Scale:  generated.NoteScale(strings.ToLower(req.Note.Scale.String())),
+			BeatID: beatID,
+			NoteID: id,
+			Scale:  generated.NoteScale(req.Note.Scale),
 		}
 	}
 
@@ -371,9 +419,9 @@ func ToModelUpdateBeatParams(req *audiov1.UpdateBeatRequest) UpdateBeatParams {
 		rangeEnd = &req.Range.End
 	}
 
-	return UpdateBeatParams{
+	return &UpdateBeatParams{
 		UpdateBeatParams: generated.UpdateBeatParams{
-			ID:                  uuid.MustParse(req.BeatId),
+			ID:                  beatID,
 			Name:                name,
 			Description:         description,
 			Bpm:                 bpm,
@@ -387,12 +435,23 @@ func ToModelUpdateBeatParams(req *audiov1.UpdateBeatRequest) UpdateBeatParams {
 		Moods:  moods,
 		Tags:   tags,
 		Note:   note,
-	}
+	}, nil
 }
 
-func ToModelGetArchiveParams(req *audiov1.AcquireBeatRequest) generated.SaveOwnerParams {
-	return generated.SaveOwnerParams{
-		BeatID: uuid.MustParse(req.BeatId),
-		UserID: uuid.MustParse(req.UserId),
+func ToModelGetArchiveParams(req *audiov1.AcquireBeatRequest) (*generated.SaveOwnerParams, error) {
+	var beatID, userID uuid.UUID
+	var err error
+
+	if beatID, err = uuid.Parse(req.BeatId); err != nil {
+		return nil, NewErr(ErrInvalidID, "beat id must be uuid")
 	}
+
+	if userID, err = uuid.Parse(req.UserId); err != nil {
+		return nil, NewErr(ErrInvalidID, "user id must be uuid")
+	}
+
+	return &generated.SaveOwnerParams{
+		BeatID: beatID,
+		UserID: userID,
+	}, nil
 }

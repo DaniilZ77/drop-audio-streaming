@@ -2,8 +2,8 @@ package http
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
-	"time"
 
 	"net/http/pprof"
 
@@ -11,7 +11,6 @@ import (
 	client "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/client"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/config"
 	router "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/http"
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	beat "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/service"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/rs/cors"
@@ -23,6 +22,7 @@ type App struct {
 	httpServer *http.Server
 	cert       string
 	key        string
+	log        *slog.Logger
 }
 
 func New(
@@ -30,24 +30,25 @@ func New(
 	cfg *config.Config,
 	beatService *beat.BeatService,
 	grpcUserClient *client.Client,
+	log *slog.Logger,
 ) *App {
 	// creds, err := credentials.NewClientTLSFromFile(cfg.Cert, "") nolint
 	// if err != nil {
 	// 	logger.Log().Fatal(ctx, "failed to create server TLS credentials: %v", err)
 	// }
 
-	conn, err := grpc.NewClient(cfg.GRPCPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(cfg.GrpcPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logger.Log().Fatal(ctx, "failed to dial server: %s", err.Error())
+		panic(err)
 	}
 
 	gwmux := runtime.NewServeMux()
-	router.NewRouter(gwmux, beatService, beatService)
+	router.NewRouter(gwmux, beatService, beatService, log)
 
 	// Register user
 	err = audiov1.RegisterBeatServiceHandler(ctx, gwmux, conn)
 	if err != nil {
-		logger.Log().Fatal(ctx, "failed to register gateway: %v", err.Error())
+		panic(err)
 	}
 
 	mux := http.NewServeMux()
@@ -59,40 +60,40 @@ func New(
 
 	// Server
 	gwServer := &http.Server{
-		Addr:              cfg.HTTPPort,
-		Handler:           interceptorLogger(withCors),
-		ReadHeaderTimeout: time.Duration(cfg.ReadTimeout) * time.Second,
+		Addr:    cfg.HttpPort,
+		Handler: interceptorLogger(withCors, log),
 	}
 
 	return &App{
 		httpServer: gwServer,
-		cert:       cfg.Cert,
-		key:        cfg.Key,
+		cert:       cfg.Tls.Cert,
+		key:        cfg.Tls.Key,
+		log:        log,
 	}
 }
 
 func (app *App) MustRun(ctx context.Context) {
 	if err := app.Run(ctx); err != nil {
-		logger.Log().Fatal(ctx, "failed to run http server: %s", err.Error())
+		panic(err)
 	}
 }
 
 func (app *App) Run(ctx context.Context) error {
-	logger.Log().Info(ctx, "http server started on %s", app.httpServer.Addr)
+	app.log.Info("http server started", slog.String("port", app.httpServer.Addr))
 	// return app.httpServer.ListenAndServeTLS(app.cert, app.key)
 	return app.httpServer.ListenAndServe()
 }
 
 func (app *App) Stop(ctx context.Context) {
-	logger.Log().Info(ctx, "stopping http server")
+	app.log.Info("stopping http server")
 	if err := app.httpServer.Shutdown(ctx); err != nil {
-		logger.Log().Fatal(ctx, "failed to shutdown http server: %s", err.Error())
+		panic(err)
 	}
 }
 
-func interceptorLogger(h http.Handler) http.Handler {
+func interceptorLogger(h http.Handler, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		logger.Log().Debug(req.Context(), req.URL.String())
+		log.DebugContext(req.Context(), req.URL.String())
 
 		h.ServeHTTP(w, req)
 	})

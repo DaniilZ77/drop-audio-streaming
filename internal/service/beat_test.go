@@ -1,343 +1,476 @@
 package beat
 
-// import (
-// 	"context"
-// 	"errors"
-// 	"io"
-// 	"strings"
-// 	"testing"
+import (
+	"context"
+	"errors"
+	"io"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
 
-// 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core"
-// 	mocks "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/core/mocks"
-// 	"github.com/stretchr/testify/assert"
-// 	"github.com/stretchr/testify/mock"
-// 	"github.com/stretchr/testify/require"
-// )
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger/slogdiscard"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/service/mocks"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+)
 
-// var (
-// 	ctx = context.Background()
-// )
+type dependencies struct {
+	beatService       *BeatService
+	beatModifier      *mocks.BeatModifier
+	beatProvider      *mocks.BeatProvider
+	urlProvider       *mocks.URLProvider
+	mediaUploader     *mocks.MediaUploader
+	beatBytesProvider *mocks.BeatBytesProvider
+	config            *BeatServiceConfig
+}
 
-// func TestGetBeatFromS3_Success(t *testing.T) {
-// 	t.Parallel()
+func createService(t *testing.T) dependencies {
+	t.Helper()
 
-// 	beatStorage := mocks.NewMockBeatStorage(t)
+	beatModifier := mocks.NewBeatModifier(t)
+	beatProvider := mocks.NewBeatProvider(t)
+	urlProvider := mocks.NewURLProvider(t)
+	mediaUploader := mocks.NewMediaUploader(t)
+	beatBytesProvider := mocks.NewBeatBytesProvider(t)
+	config := NewBeatServiceConfig(100, 200, 300, "secret", 100)
 
-// 	beatService := New(beatStorage, 0)
+	beatService := NewBeatService(
+		beatModifier,
+		beatProvider,
+		urlProvider,
+		mediaUploader,
+		beatBytesProvider,
+		config,
+		slogdiscard.NewDiscardLogger(),
+	)
 
-// 	beat := &core.Beat{
-// 		FilePath: "path/to/beat1",
-// 	}
-// 	start, end := 0, 100
+	return dependencies{
+		beatService:       beatService,
+		beatModifier:      beatModifier,
+		beatProvider:      beatProvider,
+		urlProvider:       urlProvider,
+		mediaUploader:     mediaUploader,
+		beatBytesProvider: beatBytesProvider,
+		config:            config,
+	}
+}
 
-// 	beatStorage.EXPECT().
-// 		GetBeatByID(mock.Anything, 1, core.True).
-// 		Return(beat, nil).
-// 		Once()
-// 	beatStorage.EXPECT().
-// 		GetBeatFromS3(mock.Anything, beat.FilePath, start, &end).
-// 		Return(io.NopCloser(strings.NewReader("Hello, World")), 200, "application/json", nil).
-// 		Once()
+var (
+	name        = "imagine dragons"
+	contentType = "audio/mp3"
+	file        = strings.NewReader("content")
+)
 
-// 	obj, size, contentType, err := beatService.GetBeatFromS3(ctx, 1, start, &end)
-// 	require.NoError(t, err)
-// 	assert.Equal(t, 200, size)
-// 	assert.Equal(t, "application/json", contentType)
+func TestUploadMedia_Success(t *testing.T) {
+	t.Parallel()
 
-// 	body, err := io.ReadAll(obj)
-// 	require.NoError(t, err)
+	s := createService(t)
 
-// 	assert.Equal(t, "Hello, World", string(body))
-// }
+	ctx := context.Background()
+	contentLength := int64(10)
+	expiry := time.Now().Add(time.Hour)
 
-// func TestGetBeatFromS3_Fail(t *testing.T) {
-// 	t.Parallel()
+	meta := model.MediaMeta{
+		MediaType:         model.MediaTypeFile,
+		HttpContentType:   contentType,
+		HttpContentLength: contentLength,
+		Name:              name,
+		Expiry:            expiry.Unix(),
+		UploadURL:         s.beatService.getSaveMediaURL(name, model.MediaTypeFile, expiry),
+	}
 
-// 	beatStorage := mocks.NewMockBeatStorage(t)
+	s.mediaUploader.On("UploadMedia", ctx, name, contentType, file).Return(nil).Once()
 
-// 	beatService := New(beatStorage, 0)
+	err := s.beatService.UploadMedia(ctx, file, meta)
+	assert.NoError(t, err)
+}
 
-// 	s3err := errors.New("s3 error")
+func TestUploadMedia_FailURLExpired(t *testing.T) {
+	t.Parallel()
 
-// 	tests := []struct {
-// 		name      string
-// 		behaviour func()
-// 		err       error
-// 	}{
-// 		{
-// 			name: "beat not found",
-// 			behaviour: func() {
-// 				beatStorage.EXPECT().
-// 					GetBeatByID(mock.Anything, 1, core.True).
-// 					Return(nil, core.ErrBeatNotFound).
-// 					Once()
-// 			},
-// 			err: core.ErrBeatNotFound,
-// 		},
-// 		{
-// 			name: "s3 error",
-// 			behaviour: func() {
-// 				beatStorage.EXPECT().
-// 					GetBeatByID(mock.Anything, 1, core.True).
-// 					Return(&core.Beat{}, nil).
-// 					Once()
-// 				beatStorage.EXPECT().
-// 					GetBeatFromS3(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-// 					Return(nil, 0, "", s3err).
-// 					Once()
-// 			},
-// 			err: s3err,
-// 		},
-// 	}
+	s := createService(t)
 
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			tt.behaviour()
+	ctx := context.Background()
+	contentLength := int64(10)
+	expiry := time.Now().Add(-time.Hour)
 
-// 			_, _, _, err := beatService.GetBeatFromS3(ctx, 1, 0, nil)
-// 			assert.ErrorIs(t, err, tt.err)
-// 		})
-// 	}
-// }
+	meta := model.MediaMeta{
+		MediaType:         model.MediaTypeFile,
+		HttpContentType:   contentType,
+		HttpContentLength: contentLength,
+		Name:              name,
+		Expiry:            expiry.Unix(),
+		UploadURL:         s.beatService.getSaveMediaURL(name, model.MediaTypeFile, expiry),
+	}
 
-// func TestWritePartialContent(t *testing.T) {
-// 	t.Parallel()
+	err := s.beatService.UploadMedia(ctx, file, meta)
+	assert.ErrorIs(t, err, model.ErrURLExpired)
+}
 
-// 	beatStorage := mocks.NewMockBeatStorage(t)
+func TestUploadMedia_FailSizeExceeded(t *testing.T) {
+	t.Parallel()
 
-// 	beatService := New(beatStorage, 0)
+	s := createService(t)
 
-// 	r := io.NopCloser(strings.NewReader("Hello, World"))
-// 	w := &strings.Builder{}
-// 	chunkSize := 5
+	ctx := context.Background()
+	contentLength := int64(500)
+	expiry := time.Now().Add(time.Hour)
 
-// 	err := beatService.WritePartialContent(ctx, r, w, chunkSize)
-// 	require.NoError(t, err)
+	tests := []struct {
+		name      string
+		mediaType model.MediaType
+	}{
+		{
+			name:      "file",
+			mediaType: model.MediaTypeFile,
+		},
+		{
+			name:      "archive",
+			mediaType: model.MediaTypeArchive,
+		},
+		{
+			name:      "image",
+			mediaType: model.MediaTypeImage,
+		},
+	}
 
-// 	assert.Equal(t, "Hello, World", w.String())
-// }
+	meta := model.MediaMeta{
+		HttpContentType:   contentType,
+		HttpContentLength: contentLength,
+		Name:              name,
+		Expiry:            expiry.Unix(),
+	}
 
-// func TestAddBeat(t *testing.T) {
-// 	t.Parallel()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			meta.MediaType = tt.mediaType
+			meta.UploadURL = s.beatService.getSaveMediaURL(name, tt.mediaType, expiry)
 
-// 	beatStorage := mocks.NewMockBeatStorage(t)
+			err := s.beatService.UploadMedia(ctx, file, meta)
+			assert.ErrorIs(t, err, model.ErrSizeExceeded)
+		})
+	}
+}
 
-// 	beatService := New(beatStorage, 0)
+func TestUploadMedia_FailInvalidHash(t *testing.T) {
+	t.Parallel()
 
-// 	beat := core.BeatParams{
-// 		Beat: core.Beat{
-// 			ID:   1,
-// 			Name: "beat1",
-// 		},
-// 		Genres: []core.BeatGenre{
-// 			{
-// 				ID:      1,
-// 				BeatID:  1,
-// 				GenreID: 1,
-// 			},
-// 		},
-// 	}
-// 	var path string
+	s := createService(t)
 
-// 	beatStorage.EXPECT().
-// 		AddBeat(mock.Anything, mock.MatchedBy(func(beat core.BeatParams) bool {
-// 			path = beat.Beat.FilePath
-// 			return beat.Beat.ID == 1 && beat.Beat.Name == "beat1"
-// 		})).
-// 		Return(1, nil).
-// 		Once()
+	ctx := context.Background()
+	contentLength := int64(10)
+	expiry := time.Now().Add(time.Hour)
 
-// 	beatPath, _, err := beatService.AddBeat(ctx, beat)
-// 	require.NoError(t, err)
-// 	assert.Equal(t, path, beatPath)
-// }
+	meta := model.MediaMeta{
+		MediaType:         model.MediaTypeFile,
+		HttpContentType:   contentType,
+		HttpContentLength: contentLength,
+		Name:              name,
+		Expiry:            expiry.Unix(),
+		UploadURL:         "invalid",
+	}
 
-// func TestAddBeat_BeatExists(t *testing.T) {
-// 	t.Parallel()
+	err := s.beatService.UploadMedia(ctx, file, meta)
+	assert.ErrorIs(t, err, model.ErrInvalidHash)
+}
 
-// 	beatStorage := mocks.NewMockBeatStorage(t)
+func TestUpdateBeat_Success(t *testing.T) {
+	t.Parallel()
 
-// 	beatService := New(beatStorage, 0)
+	s := createService(t)
 
-// 	beat := core.BeatParams{
-// 		Beat: core.Beat{
-// 			ID:   1,
-// 			Name: "beat1",
-// 		},
-// 		Genres: []core.BeatGenre{
-// 			{
-// 				ID:      1,
-// 				BeatID:  1,
-// 				GenreID: 1,
-// 			},
-// 		},
-// 	}
+	ctx := context.Background()
+	notDownloaded := false
+	beat := model.UpdateBeatParams{
+		UpdateBeatParams: generated.UpdateBeatParams{
+			ID:                uuid.New(),
+			IsImageDownloaded: &notDownloaded,
+			IsFileDownloaded:  &notDownloaded,
+		},
+	}
 
-// 	beatStorage.EXPECT().
-// 		AddBeat(mock.Anything, mock.Anything).
-// 		Return(0, core.ErrBeatExists).
-// 		Once()
-// 	beatStorage.EXPECT().
-// 		GetBeatByID(mock.Anything, 1, core.Any).
-// 		Return(&core.Beat{
-// 			FilePath: "path/to/beat1",
-// 		}, nil).
-// 		Once()
+	s.beatModifier.On("UpdateBeat", mock.Anything, beat).Return(&generated.Beat{
+		IsImageDownloaded:   false,
+		IsFileDownloaded:    false,
+		IsArchiveDownloaded: true,
+	}, nil).Once()
 
-// 	beatPath, _, err := beatService.AddBeat(ctx, beat)
-// 	require.NoError(t, err)
-// 	assert.Equal(t, "path/to/beat1", beatPath)
-// }
+	file, image, archive, err := s.beatService.UpdateBeat(ctx, beat)
+	require.NoError(t, err)
+	assert.NotNil(t, file)
+	assert.NotNil(t, image)
+	assert.Nil(t, archive)
+}
 
-// func TestAddBeat_Fail(t *testing.T) {
-// 	t.Parallel()
+func TestUpdateBeat_Fail(t *testing.T) {
+	t.Parallel()
 
-// 	beatStorage := mocks.NewMockBeatStorage(t)
+	s := createService(t)
 
-// 	beatService := New(beatStorage, 0)
+	s.beatModifier.On("UpdateBeat", mock.Anything, mock.Anything).Return(nil, model.ErrBeatNotFound).Once()
 
-// 	beat := core.BeatParams{
-// 		Beat: core.Beat{
-// 			ID:   1,
-// 			Name: "beat1",
-// 		},
-// 		Genres: []core.BeatGenre{
-// 			{
-// 				ID:      1,
-// 				BeatID:  1,
-// 				GenreID: 1,
-// 			},
-// 		},
-// 	}
+	_, _, _, err := s.beatService.UpdateBeat(context.Background(), model.UpdateBeatParams{})
+	assert.ErrorIs(t, err, model.ErrBeatNotFound)
+}
 
-// 	beatStorage.EXPECT().
-// 		AddBeat(mock.Anything, mock.Anything).
-// 		Return(0, errors.New("db error")).
-// 		Once()
+func TestGetBeats_Success(t *testing.T) {
+	t.Parallel()
 
-// 	_, _, err := beatService.AddBeat(ctx, beat)
-// 	assert.Error(t, err)
-// }
+	s := createService(t)
 
-// func TestGetBeatByFilter(t *testing.T) {
-// 	t.Parallel()
+	ctx := context.Background()
+	params := model.GetBeatsParams{}
+	beats := []model.Beat{
+		{
+			ID: uuid.New(),
+		},
+		{
+			ID: uuid.New(),
+		},
+	}
+	total := uint64(2)
+	url1 := "url1"
+	url2 := "url2"
 
-// 	beatStorage := mocks.NewMockBeatStorage(t)
+	s.beatProvider.On("GetBeats", mock.Anything, params).Return(beats, &total, nil).Once()
+	s.urlProvider.On("GetDownloadMediaURL", mock.Anything, beats[0].ImagePath, time.Minute*time.Duration(s.config.urlTTL)).Return(&url1, nil).Once()
+	s.urlProvider.On("GetDownloadMediaURL", mock.Anything, beats[1].ImagePath, time.Minute*time.Duration(s.config.urlTTL)).Return(&url2, nil).Once()
 
-// 	beatService := New(beatStorage, 0)
+	res, resTotal, err := s.beatService.GetBeats(ctx, params)
+	require.NoError(t, err)
+	assert.Equal(t, total, *resTotal)
+	for i := range beats {
+		assert.Equal(t, "url"+strconv.Itoa(i+1), res[i].ImagePath)
+		assert.Equal(t, beats[i].ID, res[i].ID)
+	}
+}
 
-// 	userID := 2
-// 	filter := core.FeedFilter{
-// 		Genres: []int{1},
-// 	}
+func TestGetBeats_Fail(t *testing.T) {
+	t.Parallel()
 
-// 	beatStorage.EXPECT().
-// 		GetUserSeenBeats(mock.Anything, userID).
-// 		Return([]string{"path/to/beat1"}, nil).
-// 		Once()
-// 	beatStorage.EXPECT().
-// 		GetBeatByFilter(mock.Anything, filter, []string{"path/to/beat1"}).
-// 		Return(&core.BeatParams{
-// 			Beat: core.Beat{
-// 				ID:   1,
-// 				Name: "beat1",
-// 			},
-// 			Genres: []core.BeatGenre{
-// 				{
-// 					ID:      1,
-// 					BeatID:  1,
-// 					GenreID: 1,
-// 				},
-// 			},
-// 		}, nil).
-// 		Once()
-// 	beatStorage.EXPECT().
-// 		ReplaceUserSeenBeat(mock.Anything, userID, 1).
-// 		Return(nil).
-// 		Once()
+	s := createService(t)
 
-// 	beat, err := beatService.GetBeatByFilter(ctx, userID, filter)
-// 	require.NoError(t, err)
-// 	assert.Equal(t, "beat1", beat.Beat.Name)
-// 	assert.Equal(t, 1, beat.Beat.ID)
-// 	require.Len(t, beat.Genres, 1)
-// 	assert.Equal(t, 1, beat.Genres[0].GenreID)
-// }
+	expErr := errors.New("error")
 
-// func TestGetBeatByFilter_Fail(t *testing.T) {
-// 	t.Parallel()
+	s.beatProvider.On("GetBeats", mock.Anything, mock.Anything).Return(nil, nil, expErr).Once()
 
-// 	beatStorage := mocks.NewMockBeatStorage(t)
+	_, _, err := s.beatService.GetBeats(context.Background(), model.GetBeatsParams{})
+	assert.ErrorIs(t, expErr, err)
+}
 
-// 	beatService := New(beatStorage, 0)
+func TestGetBeatStream_Success(t *testing.T) {
+	t.Parallel()
 
-// 	userID := 2
-// 	filter := core.FeedFilter{
-// 		Genres: []int{1},
-// 	}
+	s := createService(t)
 
-// 	beatStorage.EXPECT().
-// 		GetUserSeenBeats(mock.Anything, userID).
-// 		Return([]string{"path/to/beat1"}, nil).
-// 		Once()
-// 	beatStorage.EXPECT().
-// 		GetBeatByFilter(mock.Anything, filter, []string{"path/to/beat1"}).
-// 		Return(nil, errors.New("db error")).
-// 		Once()
+	ctx := context.Background()
+	beatID := uuid.New()
+	start := 5
+	end := 10
+	beat := generated.Beat{
+		ID:               beatID,
+		FilePath:         uuid.NewString(),
+		IsFileDownloaded: true,
+	}
+	size := 100
+	file := io.NopCloser(strings.NewReader("content"))
 
-// 	_, err := beatService.GetBeatByFilter(ctx, userID, filter)
-// 	assert.Error(t, err)
-// }
+	s.beatProvider.On("GetBeatByID", mock.Anything, beatID).Return(&beat, nil).Once()
+	s.beatBytesProvider.On("GetBeatBytes", mock.Anything, beat.FilePath, &start, &end).Return(file, &size, &contentType, nil).Once()
 
-// func TestGetBeatByFilter_NotFound(t *testing.T) {
-// 	t.Parallel()
+	resFile, resSlice, resContentType, err := s.beatService.GetBeatStream(ctx, beatID, &start, &end)
+	require.NoError(t, err)
+	assert.Equal(t, file, resFile)
+	if assert.NotNil(t, resSlice) {
+		assert.Equal(t, size, *resSlice)
+	}
+	if assert.NotNil(t, resContentType) {
+		assert.Equal(t, contentType, *resContentType)
+	}
+}
 
-// 	beatStorage := mocks.NewMockBeatStorage(t)
+func TestGetBeatStream_FailFileNotDownloaded(t *testing.T) {
+	t.Parallel()
 
-// 	beatService := New(beatStorage, 0)
+	s := createService(t)
 
-// 	userID := 2
-// 	filter := core.FeedFilter{
-// 		Genres: []int{1},
-// 	}
+	ctx := context.Background()
+	beat := generated.Beat{IsFileDownloaded: false}
+	start, end := 5, 10
 
-// 	beatStorage.EXPECT().
-// 		GetUserSeenBeats(mock.Anything, userID).
-// 		Return([]string{"path/to/beat1"}, nil).
-// 		Once()
-// 	beatStorage.EXPECT().
-// 		GetBeatByFilter(mock.Anything, filter, []string{"path/to/beat1"}).
-// 		Return(nil, core.ErrBeatNotFound).
-// 		Once()
-// 	beatStorage.EXPECT().
-// 		ClearUserSeenBeats(mock.Anything, userID).
-// 		Return(nil).
-// 		Once()
-// 	beatStorage.EXPECT().
-// 		GetBeatByFilter(mock.Anything, filter, []string{}).
-// 		Return(&core.BeatParams{
-// 			Beat: core.Beat{
-// 				ID:   1,
-// 				Name: "beat1",
-// 			},
-// 			Genres: []core.BeatGenre{
-// 				{
-// 					ID:      1,
-// 					BeatID:  1,
-// 					GenreID: 1,
-// 				},
-// 			},
-// 		}, nil).
-// 		Once()
-// 	beatStorage.EXPECT().
-// 		ReplaceUserSeenBeat(mock.Anything, userID, 1).
-// 		Return(nil).
-// 		Once()
+	s.beatProvider.On("GetBeatByID", mock.Anything, mock.Anything).Return(&beat, nil).Once()
 
-// 	beat, err := beatService.GetBeatByFilter(ctx, userID, filter)
-// 	require.NoError(t, err)
-// 	assert.Equal(t, "beat1", beat.Beat.Name)
-// 	assert.Equal(t, 1, beat.Beat.ID)
-// 	require.Len(t, beat.Genres, 1)
-// 	assert.Equal(t, 1, beat.Genres[0].GenreID)
-// }
+	_, _, _, err := s.beatService.GetBeatStream(ctx, uuid.New(), &start, &end)
+	assert.ErrorIs(t, err, model.ErrBeatNotFound)
+}
+
+func TestGetBeatStream_Fail(t *testing.T) {
+	t.Parallel()
+
+	s := createService(t)
+
+	tests := []struct {
+		name string
+		beh  func()
+	}{
+		{
+			name: "get beat by id error",
+			beh: func() {
+				s.beatProvider.On("GetBeatByID", mock.Anything, mock.Anything).Return(nil, model.ErrBeatNotFound).Once()
+			},
+		},
+		{
+			name: "get beat bytes error",
+			beh: func() {
+				beat := generated.Beat{IsFileDownloaded: true}
+				s.beatProvider.On("GetBeatByID", mock.Anything, mock.Anything).Return(&beat, nil).Once()
+				s.beatBytesProvider.On("GetBeatBytes", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil, nil, model.ErrBeatNotFound).Once()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.beh()
+
+			_, _, _, err := s.beatService.GetBeatStream(context.Background(), uuid.New(), nil, nil)
+			assert.ErrorIs(t, err, model.ErrBeatNotFound)
+		})
+	}
+}
+
+func TestGetBeatArchive_Success(t *testing.T) {
+	t.Parallel()
+
+	s := createService(t)
+
+	ctx := context.Background()
+	url := "url"
+	params := generated.SaveOwnerParams{
+		BeatID: uuid.New(),
+		UserID: uuid.New(),
+	}
+	owner := generated.BeatsOwner(params)
+	beat := generated.Beat{
+		ID:                  params.BeatID,
+		ArchivePath:         uuid.NewString(),
+		IsArchiveDownloaded: true,
+	}
+
+	s.beatProvider.On("GetBeatByID", mock.Anything, params.BeatID).Return(&beat, nil).Once()
+	s.beatProvider.On("GetOwnerByBeatID", mock.Anything, params.BeatID).Return(&owner, nil).Once()
+	s.urlProvider.On("GetDownloadMediaURL", mock.Anything, beat.ArchivePath, time.Minute*time.Duration(s.config.urlTTL)).Return(&url, nil).Once()
+
+	res, err := s.beatService.GetBeatArchive(ctx, params)
+	require.NoError(t, err)
+	assert.Equal(t, url, *res)
+}
+
+func TestGetBeatArchive_FailArchiveNotFound(t *testing.T) {
+	t.Parallel()
+
+	s := createService(t)
+	s.beatProvider.On("GetBeatByID", mock.Anything, mock.Anything).Return(&generated.Beat{}, nil).Once()
+
+	_, err := s.beatService.GetBeatArchive(context.Background(), generated.SaveOwnerParams{})
+	assert.ErrorIs(t, err, model.ErrArchiveNotFound)
+}
+
+func TestGetBeatArchive_FailInvalidOwner(t *testing.T) {
+	t.Parallel()
+
+	s := createService(t)
+
+	ctx := context.Background()
+	params := generated.SaveOwnerParams{
+		BeatID: uuid.New(),
+		UserID: uuid.New(),
+	}
+	owner := generated.BeatsOwner{
+		BeatID: params.BeatID,
+		UserID: uuid.New(),
+	}
+
+	s.beatProvider.On("GetBeatByID", mock.Anything, params.BeatID).Return(&generated.Beat{IsArchiveDownloaded: true}, nil).Once()
+	s.beatProvider.On("GetOwnerByBeatID", mock.Anything, params.BeatID).Return(&owner, nil).Once()
+
+	_, err := s.beatService.GetBeatArchive(ctx, params)
+	assert.ErrorIs(t, err, model.ErrInvalidOwner)
+}
+
+func TestGetBeatArchive_SuccessOwnerNotFound(t *testing.T) {
+	t.Parallel()
+
+	s := createService(t)
+
+	ctx := context.Background()
+	params := generated.SaveOwnerParams{
+		BeatID: uuid.New(),
+		UserID: uuid.New(),
+	}
+
+	s.beatProvider.On("GetBeatByID", mock.Anything, params.BeatID).Return(&generated.Beat{IsArchiveDownloaded: true}, nil).Once()
+	s.beatProvider.On("GetOwnerByBeatID", mock.Anything, params.BeatID).Return(nil, model.ErrOwnerNotFound).Once()
+	s.beatModifier.On("SaveOwner", mock.Anything, params).Return(nil).Once()
+	s.urlProvider.On("GetDownloadMediaURL", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
+
+	_, err := s.beatService.GetBeatArchive(ctx, params)
+	assert.NoError(t, err)
+}
+
+func TestGetBeatArchive_Fail(t *testing.T) {
+	t.Parallel()
+
+	s := createService(t)
+
+	expErr := errors.New("error")
+
+	tests := []struct {
+		name string
+		beh  func()
+	}{
+		{
+			name: "get beat by id error",
+			beh: func() {
+				s.beatProvider.On("GetBeatByID", mock.Anything, mock.Anything).Return(nil, expErr).Once()
+			},
+		},
+		{
+			name: "get owner by beat id error",
+			beh: func() {
+				s.beatProvider.On("GetBeatByID", mock.Anything, mock.Anything).Return(&generated.Beat{IsArchiveDownloaded: true}, nil).Once()
+				s.beatProvider.On("GetOwnerByBeatID", mock.Anything, mock.Anything).Return(nil, expErr).Once()
+			},
+		},
+		{
+			name: "save owner error",
+			beh: func() {
+				s.beatProvider.On("GetBeatByID", mock.Anything, mock.Anything).Return(&generated.Beat{IsArchiveDownloaded: true}, nil).Once()
+				s.beatProvider.On("GetOwnerByBeatID", mock.Anything, mock.Anything).Return(nil, model.ErrOwnerNotFound).Once()
+				s.beatModifier.On("SaveOwner", mock.Anything, mock.Anything).Return(expErr).Once()
+			},
+		},
+		{
+			name: "get download media url error",
+			beh: func() {
+				s.beatProvider.On("GetBeatByID", mock.Anything, mock.Anything).Return(&generated.Beat{IsArchiveDownloaded: true}, nil).Once()
+				s.beatProvider.On("GetOwnerByBeatID", mock.Anything, mock.Anything).Return(&generated.BeatsOwner{}, nil).Once()
+				s.urlProvider.On("GetDownloadMediaURL", mock.Anything, mock.Anything, mock.Anything).Return(nil, expErr).Once()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.beh()
+
+			_, err := s.beatService.GetBeatArchive(context.Background(), generated.SaveOwnerParams{})
+			assert.ErrorIs(t, err, expErr)
+		})
+	}
+}

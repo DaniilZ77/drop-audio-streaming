@@ -12,7 +12,10 @@ import (
 )
 
 const deleteBeat = `-- name: DeleteBeat :exec
-update beats set is_deleted = true where id = $1
+update beats
+set "is_deleted" = true,
+    "updated_at" = now()
+where id = $1
 `
 
 func (q *Queries) DeleteBeat(ctx context.Context, id uuid.UUID) error {
@@ -279,7 +282,8 @@ set "name" = coalesce($1, "name"),
     "range_end" = coalesce($5, "range_end"),
     "is_image_downloaded" = coalesce($6, "is_image_downloaded"),
     "is_file_downloaded" = coalesce($7, "is_file_downloaded"),
-    "is_archive_downloaded" = coalesce($8, "is_archive_downloaded")
+    "is_archive_downloaded" = coalesce($8, "is_archive_downloaded"),
+    "updated_at" = now()
 where "id" = $9 and "is_deleted" = false
 returning id, beatmaker_id, file_path, image_path, archive_path, name, description, is_file_downloaded, is_image_downloaded, is_archive_downloaded, range_start, range_end, is_deleted, created_at, updated_at, bpm
 `

@@ -2,14 +2,16 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
+	sl "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
 	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -27,12 +29,22 @@ type Router struct {
 	app           *runtime.ServeMux
 	beatProvider  BeatProvider
 	mediaUploader MediaUploader
+	log           *slog.Logger
+}
+
+func (r *Router) errorResponse(w http.ResponseWriter, err error, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	if err := json.NewEncoder(w).Encode(map[string]string{"message": err.Error()}); err != nil {
+		r.log.Error("write error", sl.Err(err))
+	}
 }
 
 func NewRouter(
 	app *runtime.ServeMux,
 	beatProvider BeatProvider,
 	mediaUploader MediaUploader,
+	log *slog.Logger,
 ) {
 	r := &Router{
 		app:           app,
@@ -48,7 +60,7 @@ func (r *Router) initRoutes() {
 	_ = r.app.HandlePath(http.MethodPut, "/v1/beat", r.upload)
 }
 
-func parseRangeHeader(ctx context.Context, req *http.Request) (start, end *int, err error) {
+func parseRangeHeader(req *http.Request) (start, end *int, err error) {
 	rng := strings.TrimPrefix(req.Header.Get("Range"), "bytes=")
 	if rng == "" {
 		return nil, nil, nil
@@ -56,14 +68,12 @@ func parseRangeHeader(ctx context.Context, req *http.Request) (start, end *int, 
 
 	vals := strings.Split(rng, "-")
 	if len(vals) != 2 {
-		logger.Log().Error(ctx, model.ErrInvalidRangeHeader.Error())
-		return nil, nil, model.ErrInvalidRangeHeader
+		return nil, nil, fmt.Errorf("%w: must be in form bytes=99-9999", model.ErrInvalidRangeHeader)
 	}
 
 	s, err := strconv.Atoi(vals[0])
 	if err != nil || s < 0 {
-		logger.Log().Error(ctx, model.ErrInvalidRangeHeader.Error())
-		return nil, nil, model.ErrInvalidRangeHeader
+		return nil, nil, fmt.Errorf("%w: must be non negative integer", model.ErrInvalidRangeHeader)
 	}
 
 	if vals[1] == "" {
@@ -72,8 +82,7 @@ func parseRangeHeader(ctx context.Context, req *http.Request) (start, end *int, 
 
 	e, err := strconv.Atoi(vals[1])
 	if err != nil || e < s {
-		logger.Log().Error(ctx, model.ErrInvalidRangeHeader.Error())
-		return nil, nil, model.ErrInvalidRangeHeader
+		return nil, nil, fmt.Errorf("%w: must be positive integer gte start", model.ErrInvalidRangeHeader)
 	}
 
 	return &s, &e, nil
@@ -84,33 +93,35 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 
 	data := params["id"]
 	if err := uuid.Validate(data); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		r.errorResponse(w, err, http.StatusBadRequest)
 		return
 	}
 
-	beatID := uuid.MustParse(data)
-
-	s, e, err := parseRangeHeader(ctx, req)
+	beatID, err := uuid.Parse(data)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		r.errorResponse(w, err, http.StatusBadRequest)
+		return
+	}
+
+	s, e, err := parseRangeHeader(req)
+	if err != nil {
 		if errors.Is(err, model.ErrInvalidRangeHeader) {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			r.errorResponse(w, err, http.StatusBadRequest)
 			return
 		}
-
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		r.log.Error("internal error", sl.Err(err))
+		r.errorResponse(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	beat, size, contentType, err := r.beatProvider.GetBeatStream(ctx, beatID, s, e)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, model.ErrBeatNotFound) || errors.Is(err, model.ErrInvalidRangeHeader) {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			r.errorResponse(w, err, http.StatusBadRequest)
 			return
 		}
-
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		r.log.Error("internal error", sl.Err(err))
+		r.errorResponse(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -133,53 +144,50 @@ func (r *Router) stream(w http.ResponseWriter, req *http.Request, params map[str
 	}
 
 	if _, err = io.Copy(w, beat); err != nil {
-		logger.Log().Error(ctx, err.Error())
+		r.log.Error("write error", sl.Err(err))
 	}
 }
 
-func parseUploadParams(ctx context.Context, req *http.Request) (*model.MediaMeta, error) {
+func parseUploadParams(req *http.Request) (*model.MediaMeta, error) {
 	t := req.URL.Query().Get("type")
 	if t != "file" && t != "archive" && t != "image" {
-		logger.Log().Debug(ctx, model.ErrInvalidType.Error())
-		return nil, &model.ModelError{Err: model.ErrInvalidType}
+		return nil, &model.ModelError{Err: model.ErrInvalidMediaType}
 	}
 
-	exp, err := strconv.Atoi(req.URL.Query().Get("exp"))
+	exp, err := strconv.ParseInt(req.URL.Query().Get("exp"), 10, 64)
 	if err != nil {
-		logger.Log().Debug(ctx, err.Error())
-		return nil, err
+		return nil, fmt.Errorf("%w: exp must be integer", err)
 	}
 
 	return &model.MediaMeta{
-		MediaType:     model.MediaType(t),
-		ContentType:   req.Header.Get("Content-Type"),
-		ContentLength: req.ContentLength,
-		Name:          req.URL.Query().Get("name"),
-		Expiry:        int64(exp),
-		URL:           req.URL.String(),
+		MediaType:         model.MediaType(t),
+		HttpContentType:   req.Header.Get("Content-Type"),
+		HttpContentLength: req.ContentLength,
+		Name:              req.URL.Query().Get("name"),
+		Expiry:            exp,
+		UploadURL:         req.URL.String(),
 	}, nil
 }
 
 func (r *Router) upload(w http.ResponseWriter, req *http.Request, params map[string]string) {
 	ctx := req.Context()
 
-	m, err := parseUploadParams(ctx, req)
+	m, err := parseUploadParams(req)
 	if err != nil {
-		logger.Log().Debug(ctx, err.Error())
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		r.errorResponse(w, err, http.StatusBadRequest)
 		return
 	}
 
 	defer req.Body.Close()
 
 	if err := r.mediaUploader.UploadMedia(ctx, req.Body, *m); err != nil {
-		logger.Log().Error(ctx, err.Error())
 		var modelErr *model.ModelError
 		if errors.As(err, &modelErr) {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			r.errorResponse(w, err, http.StatusBadRequest)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		r.log.Error("internal error", sl.Err(err))
+		r.errorResponse(w, err, http.StatusInternalServerError)
 		return
 	}
 

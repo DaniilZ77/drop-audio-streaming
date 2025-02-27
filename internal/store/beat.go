@@ -6,12 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
 	miniolib "github.com/minio/minio-go/v7"
 
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
+	sl "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/minio"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/postgres"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
@@ -26,19 +27,21 @@ type BeatStore struct {
 	*postgres.Postgres
 	*generated.Queries
 	bucketName string
+	log        *slog.Logger
 }
 
 func New(
 	m *minio.Minio,
 	pg *postgres.Postgres,
-	bucketName string) *BeatStore {
-	return &BeatStore{m, pg, generated.New(pg.DB), bucketName}
+	bucketName string,
+	log *slog.Logger) *BeatStore {
+	return &BeatStore{m, pg, generated.New(pg.DB), bucketName, log}
 }
 
 func (s *BeatStore) SaveBeat(ctx context.Context, beat model.SaveBeatParams) (err error) {
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to start transaction", sl.Err(err))
 		return err
 	}
 
@@ -47,47 +50,47 @@ func (s *BeatStore) SaveBeat(ctx context.Context, beat model.SaveBeatParams) (er
 	qtx := s.Queries.WithTx(tx)
 
 	if err = qtx.SaveBeat(ctx, beat.SaveBeatParams); err != nil {
-		logger.Log().Error(ctx, err.Error())
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return &model.ModelError{Err: model.ErrBeatAlreadyExists}
 		}
+		s.log.Error("failed to save beat", sl.Err(err))
 		return err
 	}
 
 	if _, err = qtx.SaveGenres(ctx, beat.Genres); err != nil {
-		logger.Log().Error(ctx, err.Error())
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-			return &model.ModelError{Err: model.ErrInvalidGenreID}
+			return model.NewErr(model.ErrInvalidID, "genre id")
 		}
+		s.log.Error("failed to save genres", sl.Err(err))
 		return err
 	}
 
 	if _, err = qtx.SaveTags(ctx, beat.Tags); err != nil {
-		logger.Log().Error(ctx, err.Error())
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-			return &model.ModelError{Err: model.ErrInvalidTagID}
+			return model.NewErr(model.ErrInvalidID, "tag id")
 		}
+		s.log.Error("failed to save tags", sl.Err(err))
 		return err
 	}
 
 	if _, err = qtx.SaveMoods(ctx, beat.Moods); err != nil {
-		logger.Log().Error(ctx, err.Error())
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-			return &model.ModelError{Err: model.ErrInvalidMoodID}
+			return model.NewErr(model.ErrInvalidID, "mood id")
 		}
+		s.log.Error("failed to save moods", sl.Err(err))
 		return err
 	}
 
 	if err = qtx.SaveNote(ctx, beat.Note); err != nil {
-		logger.Log().Error(ctx, err.Error())
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-			return &model.ModelError{Err: model.ErrInvalidNoteID}
+			return model.NewErr(model.ErrInvalidID, "note id")
 		}
+		s.log.Error("failed to save note", sl.Err(err))
 		return err
 	}
 
@@ -97,10 +100,10 @@ func (s *BeatStore) SaveBeat(ctx context.Context, beat model.SaveBeatParams) (er
 func (s *BeatStore) GetBeatByID(ctx context.Context, id uuid.UUID) (*generated.Beat, error) {
 	beat, err := s.Queries.GetBeatByID(ctx, id)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &model.ModelError{Err: model.ErrBeatNotFound}
 		}
+		return nil, err
 	}
 
 	return &beat, nil
@@ -109,7 +112,6 @@ func (s *BeatStore) GetBeatByID(ctx context.Context, id uuid.UUID) (*generated.B
 func (s *BeatStore) GetDownloadMediaURL(ctx context.Context, path string, expires time.Duration) (*string, error) {
 	url, err := s.Minio.Client.PresignedGetObject(ctx, s.bucketName, path, expires, nil)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
 		return nil, err
 	}
 
@@ -117,13 +119,12 @@ func (s *BeatStore) GetDownloadMediaURL(ctx context.Context, path string, expire
 	return &u, nil
 }
 
-func (s *BeatStore) GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total *int, err error) {
+func (s *BeatStore) GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total *uint64, err error) {
 	builder := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
 	query := builder.Select(
 		"b.id",
 		"b.beatmaker_id",
-		"b.file_path",
 		"b.image_path",
 		"b.name",
 		"b.description",
@@ -175,10 +176,10 @@ func (s *BeatStore) GetBeats(ctx context.Context, params model.GetBeatsParams) (
 		query = query.Where("g.name = any(?)", params.Genre)
 	}
 	if params.Tag != nil {
-		query = query.Where("t.tag = any(?)", params.Tag)
+		query = query.Where("t.name = any(?)", params.Tag)
 	}
 	if params.Mood != nil {
-		query = query.Where("m.mood = any(?)", params.Mood)
+		query = query.Where("m.name = any(?)", params.Mood)
 	}
 	if params.Note != nil {
 		query = query.Where("n.name = ? and bn.scale = ?", params.Note.Name, params.Note.Scale)
@@ -187,42 +188,36 @@ func (s *BeatStore) GetBeats(ctx context.Context, params model.GetBeatsParams) (
 	count := builder.Select("count(distinct b.id)").FromSelect(query, "b")
 	sql, args, err := count.ToSql()
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to convert to sql", sl.Err(err))
 		return nil, nil, err
 	}
 
-	logger.Log().Debug(ctx, sql)
-
 	if err = s.DB.QueryRow(ctx, sql, args...).Scan(&total); err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to count beats", sl.Err(err))
 		return nil, nil, err
 	}
 
 	if params.OrderBy != nil {
 		query = query.OrderBy(fmt.Sprintf("%q %s", params.OrderBy.Field, params.OrderBy.Order))
 	}
-	query = query.Limit(uint64(params.Limit)).Offset(uint64(params.Offset))
+	query = query.Limit(params.Limit).Offset(params.Offset)
 
 	sql, args, err = query.ToSql()
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to convert to sql", sl.Err(err))
 		return nil, nil, err
 	}
 
 	rows, err := s.DB.Query(ctx, sql, args...)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "42703" {
-			return nil, nil, &model.ModelError{Err: model.ErrOrderByInvalidField}
-		}
+		s.log.Error("failed to get beats", sl.Err(err))
 		return nil, nil, err
 	}
 	defer rows.Close()
 
 	beats, err = pgx.CollectRows(rows, pgx.RowToStructByName[model.Beat])
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to collect beats", sl.Err(err))
 		return nil, nil, err
 	}
 
@@ -232,25 +227,25 @@ func (s *BeatStore) GetBeats(ctx context.Context, params model.GetBeatsParams) (
 func (s *BeatStore) GetBeatParams(ctx context.Context) (params *model.BeatParams, err error) {
 	genres, err := s.Queries.GetBeatGenreParams(ctx)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to get beat genre params", sl.Err(err))
 		return nil, err
 	}
 
 	moods, err := s.Queries.GetBeatMoodParams(ctx)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to get beat mood params", sl.Err(err))
 		return nil, err
 	}
 
 	tags, err := s.Queries.GetBeatTagParams(ctx)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to get beat tag params", sl.Err(err))
 		return nil, err
 	}
 
 	notes, err := s.Queries.GetBeatNoteParams(ctx)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to get beat note params", sl.Err(err))
 		return nil, err
 	}
 
@@ -265,15 +260,15 @@ func (s *BeatStore) GetBeatParams(ctx context.Context) (params *model.BeatParams
 func (s *BeatStore) GetBeatBytes(ctx context.Context, path string, start, end *int) (file io.ReadCloser, size *int, contentType *string, err error) {
 	info, err := s.Minio.Client.StatObject(ctx, s.bucketName, path, miniolib.StatObjectOptions{})
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
-		return nil, nil, nil, &model.ModelError{Err: model.ErrBeatNotFound}
+		s.log.Error("failed to get beat info", sl.Err(err))
+		return nil, nil, nil, err
 	}
 
 	tmp := int(info.Size)
 	size = &tmp
 
 	if start != nil && *start >= *size {
-		logger.Log().Error(ctx, model.ErrInvalidRangeHeader.Error())
+		s.log.Debug("start is greater than size", slog.Int("start", *start), slog.Int("size", *size))
 		return nil, nil, nil, &model.ModelError{Err: model.ErrInvalidRangeHeader}
 	}
 
@@ -285,14 +280,14 @@ func (s *BeatStore) GetBeatBytes(ctx context.Context, path string, start, end *i
 	var opts miniolib.GetObjectOptions
 	if start != nil {
 		if err := opts.SetRange(int64(*start), int64(*end)); err != nil {
-			logger.Log().Error(ctx, err.Error())
+			s.log.Error("failed to set range", sl.Err(err))
 			return nil, nil, nil, err
 		}
 	}
 
 	file, err = s.Minio.Client.GetObject(ctx, s.bucketName, path, opts)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to get beat", sl.Err(err))
 		return nil, nil, nil, err
 	}
 
@@ -302,7 +297,7 @@ func (s *BeatStore) GetBeatBytes(ctx context.Context, path string, start, end *i
 func (s *BeatStore) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeatParams) (*generated.Beat, error) {
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to start transaction", sl.Err(err))
 		return nil, err
 	}
 
@@ -311,73 +306,73 @@ func (s *BeatStore) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeatP
 	qtx := s.Queries.WithTx(tx)
 	beat := new(generated.Beat)
 	if *beat, err = qtx.UpdateBeat(ctx, updateBeat.UpdateBeatParams); err != nil {
-		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &model.ModelError{Err: model.ErrBeatNotFound}
 		}
+		s.log.Error("failed to update beat", sl.Err(err))
 		return nil, err
 	}
 
 	if updateBeat.Genres != nil {
 		if err = qtx.DeleteBeatGenres(ctx, updateBeat.ID); err != nil {
-			logger.Log().Error(ctx, err.Error())
+			s.log.Error("failed to delete beat genres", sl.Err(err))
 			return nil, err
 		}
 
 		if _, err = qtx.SaveGenres(ctx, updateBeat.Genres); err != nil {
-			logger.Log().Error(ctx, err.Error())
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-				return nil, &model.ModelError{Err: model.ErrInvalidGenreID}
+				return nil, model.NewErr(model.ErrInvalidID, "genre id")
 			}
+			s.log.Error("failed to save genres", sl.Err(err))
 			return nil, err
 		}
 	}
 
 	if updateBeat.Tags != nil {
 		if err = qtx.DeleteBeatTags(ctx, updateBeat.ID); err != nil {
-			logger.Log().Error(ctx, err.Error())
+			s.log.Error("failed to delete beat tags", sl.Err(err))
 			return nil, err
 		}
 
 		if _, err = qtx.SaveTags(ctx, updateBeat.Tags); err != nil {
-			logger.Log().Error(ctx, err.Error())
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-				return nil, &model.ModelError{Err: model.ErrInvalidTagID}
+				return nil, model.NewErr(model.ErrInvalidID, "tag id")
 			}
+			s.log.Error("failed to save tags", sl.Err(err))
 			return nil, err
 		}
 	}
 
 	if updateBeat.Moods != nil {
 		if err = qtx.DeleteBeatMoods(ctx, updateBeat.ID); err != nil {
-			logger.Log().Error(ctx, err.Error())
+			s.log.Error("failed to delete beat moods", sl.Err(err))
 			return nil, err
 		}
 
 		if _, err = qtx.SaveMoods(ctx, updateBeat.Moods); err != nil {
-			logger.Log().Error(ctx, err.Error())
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-				return nil, &model.ModelError{Err: model.ErrInvalidMoodID}
+				return nil, model.NewErr(model.ErrInvalidID, "mood id")
 			}
+			s.log.Error("failed to save moods", sl.Err(err))
 			return nil, err
 		}
 	}
 
 	if updateBeat.Note != nil {
 		if err = qtx.DeleteBeatNotes(ctx, updateBeat.ID); err != nil {
-			logger.Log().Error(ctx, err.Error())
+			s.log.Error("failed to delete beat notes", sl.Err(err))
 			return nil, err
 		}
 
 		if err = qtx.SaveNote(ctx, *updateBeat.Note); err != nil {
-			logger.Log().Error(ctx, err.Error())
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-				return nil, &model.ModelError{Err: model.ErrInvalidNoteID}
+				return nil, model.NewErr(model.ErrInvalidID, "note id")
 			}
+			s.log.Error("failed to save note", sl.Err(err))
 			return nil, err
 		}
 	}
@@ -387,7 +382,6 @@ func (s *BeatStore) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeatP
 
 func (s *BeatStore) DeleteBeat(ctx context.Context, id uuid.UUID) error {
 	if err := s.Queries.DeleteBeat(ctx, id); err != nil {
-		logger.Log().Error(ctx, err.Error())
 		return err
 	}
 
@@ -396,7 +390,6 @@ func (s *BeatStore) DeleteBeat(ctx context.Context, id uuid.UUID) error {
 
 func (s *BeatStore) UploadMedia(ctx context.Context, path, contentType string, file io.Reader) error {
 	if _, err := s.Minio.Client.PutObject(ctx, s.bucketName, path, file, -1, miniolib.PutObjectOptions{ContentType: contentType}); err != nil {
-		logger.Log().Error(ctx, err.Error())
 		return err
 	}
 
@@ -406,7 +399,7 @@ func (s *BeatStore) UploadMedia(ctx context.Context, path, contentType string, f
 func (s *BeatStore) SaveOwner(ctx context.Context, owner generated.SaveOwnerParams) error {
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to start transaction", sl.Err(err))
 		return err
 	}
 
@@ -414,12 +407,12 @@ func (s *BeatStore) SaveOwner(ctx context.Context, owner generated.SaveOwnerPara
 
 	qtx := s.Queries.WithTx(tx)
 	if err := qtx.DeleteBeat(ctx, owner.BeatID); err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to delete beat", sl.Err(err))
 		return err
 	}
 
 	if err := qtx.SaveOwner(ctx, owner); err != nil {
-		logger.Log().Error(ctx, err.Error())
+		s.log.Error("failed to save owner", sl.Err(err))
 		return err
 	}
 
@@ -429,7 +422,6 @@ func (s *BeatStore) SaveOwner(ctx context.Context, owner generated.SaveOwnerPara
 func (s *BeatStore) GetOwnerByBeatID(ctx context.Context, beatID uuid.UUID) (*generated.BeatsOwner, error) {
 	owner, err := s.Queries.GetOwnerByBeatID(ctx, beatID)
 	if err != nil {
-		logger.Log().Error(ctx, err.Error())
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &model.ModelError{Err: model.ErrOwnerNotFound}
 		}

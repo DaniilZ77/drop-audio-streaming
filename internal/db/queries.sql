@@ -42,7 +42,8 @@ set "name" = coalesce(sqlc.narg('name'), "name"),
     "range_end" = coalesce(sqlc.narg('range_end'), "range_end"),
     "is_image_downloaded" = coalesce(sqlc.narg('is_image_downloaded'), "is_image_downloaded"),
     "is_file_downloaded" = coalesce(sqlc.narg('is_file_downloaded'), "is_file_downloaded"),
-    "is_archive_downloaded" = coalesce(sqlc.narg('is_archive_downloaded'), "is_archive_downloaded")
+    "is_archive_downloaded" = coalesce(sqlc.narg('is_archive_downloaded'), "is_archive_downloaded"),
+    "updated_at" = now()
 where "id" = sqlc.arg('id') and "is_deleted" = false
 returning *;
 
@@ -59,7 +60,10 @@ delete from beats_moods where beat_id = $1;
 delete from beats_notes where beat_id = $1;
 
 -- name: DeleteBeat :exec
-update beats set is_deleted = true where id = $1;
+update beats
+set "is_deleted" = true,
+    "updated_at" = now()
+where id = $1;
 
 -- name: SaveOwner :exec
 insert into beats_owners ("beat_id", "user_id") values ($1, $2);

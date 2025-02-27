@@ -1,13 +1,17 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "user/user.proto",
-    "version": "version not set"
+    "title": "Drop Auth Service",
+    "version": "1.0"
   },
   "tags": [
     {
       "name": "UserService"
     }
+  ],
+  "host": "localhost:8080",
+  "schemes": [
+    "http"
   ],
   "consumes": [
     "application/json"
@@ -39,34 +43,6 @@
       }
     },
     "/v1/admin": {
-      "delete": {
-        "operationId": "UserService_DeleteAdmin",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/userDeleteAdminResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "username",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "UserService"
-        ]
-      },
       "post": {
         "operationId": "UserService_AddAdmin",
         "responses": {
@@ -95,6 +71,11 @@
         ],
         "tags": [
           "UserService"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ]
       }
     },
@@ -130,6 +111,102 @@
         ]
       }
     },
+    "/v1/admin/{userId}": {
+      "delete": {
+        "operationId": "UserService_DeleteAdmin",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/userDeleteAdminResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/admins": {
+      "get": {
+        "operationId": "UserService_GetAdmins",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/userGetAdminsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "adminScale",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "uint64"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "uint64"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/v1/auth/login": {
       "post": {
         "operationId": "UserService_Login",
@@ -159,6 +236,11 @@
         ],
         "tags": [
           "UserService"
+        ],
+        "security": [
+          {
+            "TmaAuth": []
+          }
         ]
       }
     },
@@ -223,6 +305,11 @@
         ],
         "tags": [
           "UserService"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ]
       }
     },
@@ -278,12 +365,7 @@
             "name": "orderBy.order",
             "in": "query",
             "required": false,
-            "type": "string",
-            "enum": [
-              "ASC",
-              "DESC"
-            ],
-            "default": "ASC"
+            "type": "string"
           },
           {
             "name": "orderBy.field",
@@ -296,14 +378,14 @@
             "in": "query",
             "required": false,
             "type": "string",
-            "format": "int64"
+            "format": "uint64"
           },
           {
             "name": "offset",
             "in": "query",
             "required": false,
             "type": "string",
-            "format": "int64"
+            "format": "uint64"
           }
         ],
         "tags": [
@@ -350,10 +432,58 @@
       }
     },
     "userAddAdminResponse": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "adminScale": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "userAdmin": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "adminScale": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
     },
     "userDeleteAdminResponse": {
       "type": "object"
+    },
+    "userGetAdminsResponse": {
+      "type": "object",
+      "properties": {
+        "pagination": {
+          "$ref": "#/definitions/userPagination"
+        },
+        "admins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/userAdmin"
+          }
+        }
+      }
     },
     "userGetUserResponse": {
       "type": "object",
@@ -411,7 +541,22 @@
       }
     },
     "userInitAdminResponse": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "adminScale": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
     },
     "userLoginRequest": {
       "type": "object",
@@ -432,19 +577,11 @@
         }
       }
     },
-    "userOrder": {
-      "type": "string",
-      "enum": [
-        "ASC",
-        "DESC"
-      ],
-      "default": "ASC"
-    },
-    "userOrderBy": {
+    "userOrderByUsers": {
       "type": "object",
       "properties": {
         "order": {
-          "$ref": "#/definitions/userOrder"
+          "type": "string"
         },
         "field": {
           "type": "string"
@@ -456,19 +593,19 @@
       "properties": {
         "pages": {
           "type": "string",
-          "format": "int64"
+          "format": "uint64"
         },
         "curPage": {
           "type": "string",
-          "format": "int64"
+          "format": "uint64"
         },
         "records": {
           "type": "string",
-          "format": "int64"
+          "format": "uint64"
         },
         "recordsPerPage": {
           "type": "string",
-          "format": "int64"
+          "format": "uint64"
         }
       }
     },
@@ -552,6 +689,20 @@
           "format": "date-time"
         }
       }
+    }
+  },
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "description": "Format: `bearer \u003ctoken\u003e`",
+      "name": "Authorization",
+      "in": "header"
+    },
+    "TmaAuth": {
+      "type": "apiKey",
+      "description": "Format: `tma \u003ctoken\u003e`",
+      "name": "Authorization",
+      "in": "header"
     }
   }
 }
