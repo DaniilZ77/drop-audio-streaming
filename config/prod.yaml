@@ -1,0 +1,21 @@
+env: prod
+database_url: postgres://postgres:postgres@postgres:5432/drop-audiostreaming
+jwt_secret: secret
+grpc_port: 0.0.0.0:50052
+http_port: 0.0.0.0:8081
+verification_secret: secret # secret for url verification
+url_ttl: 60 # url ttl in minutes
+minio:
+  password: minioadmin
+  user: minioadmin
+  url: minio:9000
+  bucket: drop-audio
+  use_ssl: true
+  location: us-east-1
+grpc_client:
+  retries: 3
+  timeout: 2s
+  port: drop-auth:50051
+file_size_limit: 10000000 # 10MB
+archive_size_limit: 100000000 # 100MB
+image_size_limit: 1000000 # 1MB
