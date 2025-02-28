@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/domain/model"
 	"github.com/golang-jwt/jwt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

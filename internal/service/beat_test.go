@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/domain/model"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger/slogdiscard"
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/service/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

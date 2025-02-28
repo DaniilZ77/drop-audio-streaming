@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/domain/model"
 	sl "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
 	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 )

@@ -12,10 +12,10 @@ import (
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
 	miniolib "github.com/minio/minio-go/v7"
 
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/domain/model"
 	sl "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/minio"
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/postgres"
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

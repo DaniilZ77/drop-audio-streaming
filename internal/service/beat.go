@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
+	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/domain/model"
 	sl "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/lib/logger"
-	"github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
 	"github.com/google/uuid"
 )
 
