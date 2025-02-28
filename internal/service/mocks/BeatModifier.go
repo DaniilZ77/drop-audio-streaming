@@ -37,7 +37,7 @@ func (_m *BeatModifier) DeleteBeat(ctx context.Context, id uuid.UUID) error {
 }
 
 // SaveBeat provides a mock function with given fields: ctx, _a1
-func (_m *BeatModifier) SaveBeat(ctx context.Context, _a1 model.SaveBeatParams) error {
+func (_m *BeatModifier) SaveBeat(ctx context.Context, _a1 model.SaveBeat) error {
 	ret := _m.Called(ctx, _a1)
 
 	if len(ret) == 0 {
@@ -45,7 +45,7 @@ func (_m *BeatModifier) SaveBeat(ctx context.Context, _a1 model.SaveBeatParams) 
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, model.SaveBeatParams) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, model.SaveBeat) error); ok {
 		r0 = rf(ctx, _a1)
 	} else {
 		r0 = ret.Error(0)
@@ -73,7 +73,7 @@ func (_m *BeatModifier) SaveOwner(ctx context.Context, owner generated.SaveOwner
 }
 
 // UpdateBeat provides a mock function with given fields: ctx, _a1
-func (_m *BeatModifier) UpdateBeat(ctx context.Context, _a1 model.UpdateBeatParams) (*generated.Beat, error) {
+func (_m *BeatModifier) UpdateBeat(ctx context.Context, _a1 model.UpdateBeat) (*generated.Beat, error) {
 	ret := _m.Called(ctx, _a1)
 
 	if len(ret) == 0 {
@@ -82,10 +82,10 @@ func (_m *BeatModifier) UpdateBeat(ctx context.Context, _a1 model.UpdateBeatPara
 
 	var r0 *generated.Beat
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, model.UpdateBeatParams) (*generated.Beat, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, model.UpdateBeat) (*generated.Beat, error)); ok {
 		return rf(ctx, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, model.UpdateBeatParams) *generated.Beat); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, model.UpdateBeat) *generated.Beat); ok {
 		r0 = rf(ctx, _a1)
 	} else {
 		if ret.Get(0) != nil {
@@ -93,7 +93,7 @@ func (_m *BeatModifier) UpdateBeat(ctx context.Context, _a1 model.UpdateBeatPara
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, model.UpdateBeatParams) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, model.UpdateBeat) error); ok {
 		r1 = rf(ctx, _a1)
 	} else {
 		r1 = ret.Error(1)

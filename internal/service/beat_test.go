@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -58,6 +59,30 @@ func createService(t *testing.T) dependencies {
 		beatBytesProvider: beatBytesProvider,
 		config:            config,
 	}
+}
+
+type saveMediaURL struct {
+	Name string
+	Exp  int64
+	Type model.MediaType
+}
+
+func parseSaveMediaURL(u string) (*saveMediaURL, error) {
+	url, err := url.Parse(u)
+	if err != nil {
+		return nil, err
+	}
+
+	var res saveMediaURL
+	res.Name = url.Query().Get("name")
+	res.Type = model.MediaType(url.Query().Get("type"))
+
+	exp, err := strconv.ParseInt(url.Query().Get("exp"), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	res.Exp = exp
+	return &res, nil
 }
 
 var (
@@ -186,24 +211,43 @@ func TestUpdateBeat_Success(t *testing.T) {
 
 	ctx := context.Background()
 	notDownloaded := false
-	beat := model.UpdateBeatParams{
+	beat := model.UpdateBeat{
 		UpdateBeatParams: generated.UpdateBeatParams{
 			ID:                uuid.New(),
 			IsImageDownloaded: &notDownloaded,
 			IsFileDownloaded:  &notDownloaded,
 		},
 	}
-
-	s.beatModifier.On("UpdateBeat", mock.Anything, beat).Return(&generated.Beat{
+	retBeat := &generated.Beat{
 		IsImageDownloaded:   false,
 		IsFileDownloaded:    false,
 		IsArchiveDownloaded: true,
-	}, nil).Once()
+		ImagePath:           "imagepath",
+		FilePath:            "filepath",
+	}
 
+	s.beatModifier.On("UpdateBeat", mock.Anything, beat).Return(retBeat, nil).Once()
+
+	exp := time.Now().Add(time.Minute * time.Duration(s.config.urlTTL)).Unix()
 	file, image, archive, err := s.beatService.UpdateBeat(ctx, beat)
 	require.NoError(t, err)
-	assert.NotNil(t, file)
-	assert.NotNil(t, image)
+	const delta = 10
+	if assert.NotNil(t, file) {
+		parsed, err := parseSaveMediaURL(*file)
+		require.NoError(t, err)
+		require.NotNil(t, parsed)
+		assert.Equal(t, model.MediaTypeFile, parsed.Type)
+		assert.Equal(t, retBeat.FilePath, parsed.Name)
+		assert.InDelta(t, exp, parsed.Exp, delta)
+	}
+	if assert.NotNil(t, image) {
+		parsed, err := parseSaveMediaURL(*image)
+		require.NoError(t, err)
+		require.NotNil(t, parsed)
+		assert.Equal(t, model.MediaTypeImage, parsed.Type)
+		assert.Equal(t, retBeat.ImagePath, parsed.Name)
+		assert.InDelta(t, exp, parsed.Exp, delta)
+	}
 	assert.Nil(t, archive)
 }
 
@@ -214,7 +258,7 @@ func TestUpdateBeat_Fail(t *testing.T) {
 
 	s.beatModifier.On("UpdateBeat", mock.Anything, mock.Anything).Return(nil, model.ErrBeatNotFound).Once()
 
-	_, _, _, err := s.beatService.UpdateBeat(context.Background(), model.UpdateBeatParams{})
+	_, _, _, err := s.beatService.UpdateBeat(context.Background(), model.UpdateBeat{})
 	assert.ErrorIs(t, err, model.ErrBeatNotFound)
 }
 

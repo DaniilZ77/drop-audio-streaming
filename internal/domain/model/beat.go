@@ -31,7 +31,7 @@ type (
 		NoteScale           *string
 	}
 
-	GetBeatsNote struct {
+	BeatsNote struct {
 		Name  string
 		Scale string
 	}
@@ -46,7 +46,7 @@ type (
 		Genre        []string
 		Mood         []string
 		Tag          []string
-		Note         *GetBeatsNote
+		Note         *BeatsNote
 		BeatmakerID  *uuid.UUID
 		BeatName     *string
 		Bpm          *int
@@ -56,14 +56,14 @@ type (
 		IsDownloaded *bool
 	}
 
-	BeatParams struct {
+	BeatAttributes struct {
 		Genres []generated.Genre
 		Tags   []generated.Tag
 		Moods  []generated.Mood
 		Notes  []generated.Note
 	}
 
-	UpdateBeatParams struct {
+	UpdateBeat struct {
 		generated.UpdateBeatParams
 		Note   *generated.SaveNoteParams
 		Genres []generated.SaveGenresParams
@@ -71,7 +71,7 @@ type (
 		Moods  []generated.SaveMoodsParams
 	}
 
-	SaveBeatParams struct {
+	SaveBeat struct {
 		generated.SaveBeatParams
 		Note   generated.SaveNoteParams
 		Genres []generated.SaveGenresParams
@@ -101,7 +101,7 @@ const (
 	AdminScaleMajor  AdminScale = "major"
 )
 
-func ToModelSaveBeatParams(beat *audiov1.UploadBeatRequest) (*SaveBeatParams, error) {
+func ToModelSaveBeatParams(beat *audiov1.UploadBeatRequest) (*SaveBeat, error) {
 	genres := make([]generated.SaveGenresParams, 0, len(beat.BeatGenre))
 	tags := make([]generated.SaveTagsParams, 0, len(beat.BeatTag))
 	moods := make([]generated.SaveMoodsParams, 0, len(beat.BeatMood))
@@ -152,7 +152,7 @@ func ToModelSaveBeatParams(beat *audiov1.UploadBeatRequest) (*SaveBeatParams, er
 		})
 	}
 
-	return &SaveBeatParams{
+	return &SaveBeat{
 		SaveBeatParams: generated.SaveBeatParams{
 			ID:          beatID,
 			BeatmakerID: beatmakerID,
@@ -191,7 +191,7 @@ func ToModelGetBeatsParams(params *audiov1.GetBeatsRequest) (*GetBeatsParams, er
 	res.Tag = params.Tag
 
 	if params.Note != nil {
-		res.Note = &GetBeatsNote{
+		res.Note = &BeatsNote{
 			Name:  params.Note.Name,
 			Scale: params.Note.Scale,
 		}
@@ -284,7 +284,7 @@ func toResponseBeat(b Beat, u *userv1.GetUserResponse) *audiov1.Beat {
 	}
 }
 
-func ToGetBeatParamsResponse(b BeatParams) *audiov1.GetBeatParamsResponse {
+func ToGetBeatParamsResponse(b BeatAttributes) *audiov1.GetBeatParamsResponse {
 	genres := make([]*audiov1.GenreParam, 0, len(b.Genres))
 	tags := make([]*audiov1.TagParam, 0, len(b.Tags))
 	moods := make([]*audiov1.MoodParam, 0, len(b.Moods))
@@ -326,7 +326,7 @@ func ToGetBeatParamsResponse(b BeatParams) *audiov1.GetBeatParamsResponse {
 	}
 }
 
-func ToModelUpdateBeatParams(req *audiov1.UpdateBeatRequest) (*UpdateBeatParams, error) {
+func ToModelUpdateBeatParams(req *audiov1.UpdateBeatRequest) (*UpdateBeat, error) {
 	var genres []generated.SaveGenresParams
 	var tags []generated.SaveTagsParams
 	var moods []generated.SaveMoodsParams
@@ -419,7 +419,7 @@ func ToModelUpdateBeatParams(req *audiov1.UpdateBeatRequest) (*UpdateBeatParams,
 		rangeEnd = &req.Range.End
 	}
 
-	return &UpdateBeatParams{
+	return &UpdateBeat{
 		UpdateBeatParams: generated.UpdateBeatParams{
 			ID:                  beatID,
 			Name:                name,

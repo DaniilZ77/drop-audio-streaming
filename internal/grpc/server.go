@@ -18,14 +18,14 @@ import (
 )
 
 type BeatModifier interface {
-	SaveBeat(ctx context.Context, beat model.SaveBeatParams) (fileUploadURL, imageUploadURL, archiveUploadURL *string, err error)
-	UpdateBeat(ctx context.Context, beat model.UpdateBeatParams) (fileUploadURL, imageUploadURL, archiveUploadURL *string, err error)
+	SaveBeat(ctx context.Context, beat model.SaveBeat) (fileUploadURL, imageUploadURL, archiveUploadURL *string, err error)
+	UpdateBeat(ctx context.Context, beat model.UpdateBeat) (fileUploadURL, imageUploadURL, archiveUploadURL *string, err error)
 	DeleteBeat(ctx context.Context, id uuid.UUID) error
 }
 
 type BeatProvider interface {
 	GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total *uint64, err error)
-	GetBeatParams(ctx context.Context) (params *model.BeatParams, err error)
+	GetBeatParams(ctx context.Context) (params *model.BeatAttributes, err error)
 }
 
 type URLProvider interface {

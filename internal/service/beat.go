@@ -37,8 +37,8 @@ func NewBeatServiceConfig(fileSizeLimit int64, archiveSizeLimit int64, imageSize
 
 //go:generate mockery --name BeatModifier
 type BeatModifier interface {
-	SaveBeat(ctx context.Context, beat model.SaveBeatParams) error
-	UpdateBeat(ctx context.Context, beat model.UpdateBeatParams) (*generated.Beat, error)
+	SaveBeat(ctx context.Context, beat model.SaveBeat) error
+	UpdateBeat(ctx context.Context, beat model.UpdateBeat) (*generated.Beat, error)
 	DeleteBeat(ctx context.Context, id uuid.UUID) error
 	SaveOwner(ctx context.Context, owner generated.SaveOwnerParams) error
 }
@@ -47,7 +47,7 @@ type BeatModifier interface {
 type BeatProvider interface {
 	GetBeatByID(ctx context.Context, id uuid.UUID) (*generated.Beat, error)
 	GetBeats(ctx context.Context, params model.GetBeatsParams) (beats []model.Beat, total *uint64, err error)
-	GetBeatParams(ctx context.Context) (params *model.BeatParams, err error)
+	GetBeatParams(ctx context.Context) (attrs *model.BeatAttributes, err error)
 	GetOwnerByBeatID(ctx context.Context, beatID uuid.UUID) (*generated.BeatsOwner, error)
 }
 
@@ -133,7 +133,7 @@ func (s *BeatService) getSaveMediaURL(name string, mt model.MediaType, exp time.
 	return url
 }
 
-func (s *BeatService) SaveBeat(ctx context.Context, beat model.SaveBeatParams) (*string, *string, *string, error) {
+func (s *BeatService) SaveBeat(ctx context.Context, beat model.SaveBeat) (*string, *string, *string, error) {
 	filePath := uuid.New().String()
 	beat.FilePath = filePath
 
@@ -177,11 +177,11 @@ func (s *BeatService) GetBeats(ctx context.Context, params model.GetBeatsParams)
 	return beats, total, nil
 }
 
-func (s *BeatService) GetBeatParams(ctx context.Context) (params *model.BeatParams, err error) {
+func (s *BeatService) GetBeatParams(ctx context.Context) (attrs *model.BeatAttributes, err error) {
 	return s.beatProvider.GetBeatParams(ctx)
 }
 
-func (s *BeatService) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeatParams) (*string, *string, *string, error) {
+func (s *BeatService) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeat) (*string, *string, *string, error) {
 	beat, err := s.beatModifier.UpdateBeat(ctx, updateBeat)
 	if err != nil {
 		s.log.Error("failed to update beat", sl.Err(err))

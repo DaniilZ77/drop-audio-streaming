@@ -49,23 +49,23 @@ func (_m *BeatProvider) GetBeatByID(ctx context.Context, id uuid.UUID) (*generat
 }
 
 // GetBeatParams provides a mock function with given fields: ctx
-func (_m *BeatProvider) GetBeatParams(ctx context.Context) (*model.BeatParams, error) {
+func (_m *BeatProvider) GetBeatParams(ctx context.Context) (*model.BeatAttributes, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetBeatParams")
 	}
 
-	var r0 *model.BeatParams
+	var r0 *model.BeatAttributes
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*model.BeatParams, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (*model.BeatAttributes, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) *model.BeatParams); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) *model.BeatAttributes); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.BeatParams)
+			r0 = ret.Get(0).(*model.BeatAttributes)
 		}
 	}
 

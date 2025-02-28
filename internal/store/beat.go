@@ -38,7 +38,7 @@ func New(
 	return &BeatStore{m, pg, generated.New(pg.DB), bucketName, log}
 }
 
-func (s *BeatStore) SaveBeat(ctx context.Context, beat model.SaveBeatParams) (err error) {
+func (s *BeatStore) SaveBeat(ctx context.Context, beat model.SaveBeat) (err error) {
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
 		s.log.Error("failed to start transaction", sl.Err(err))
@@ -224,7 +224,7 @@ func (s *BeatStore) GetBeats(ctx context.Context, params model.GetBeatsParams) (
 	return beats, total, nil
 }
 
-func (s *BeatStore) GetBeatParams(ctx context.Context) (params *model.BeatParams, err error) {
+func (s *BeatStore) GetBeatParams(ctx context.Context) (attrs *model.BeatAttributes, err error) {
 	genres, err := s.Queries.GetBeatGenreParams(ctx)
 	if err != nil {
 		s.log.Error("failed to get beat genre params", sl.Err(err))
@@ -249,7 +249,7 @@ func (s *BeatStore) GetBeatParams(ctx context.Context) (params *model.BeatParams
 		return nil, err
 	}
 
-	return &model.BeatParams{
+	return &model.BeatAttributes{
 		Genres: genres,
 		Moods:  moods,
 		Tags:   tags,
@@ -294,7 +294,7 @@ func (s *BeatStore) GetBeatBytes(ctx context.Context, path string, start, end *i
 	return file, size, &info.ContentType, nil
 }
 
-func (s *BeatStore) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeatParams) (*generated.Beat, error) {
+func (s *BeatStore) UpdateBeat(ctx context.Context, updateBeat model.UpdateBeat) (*generated.Beat, error) {
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
 		s.log.Error("failed to start transaction", sl.Err(err))
