@@ -8,7 +8,7 @@ import (
 	generated "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/db/generated"
 	mock "github.com/stretchr/testify/mock"
 
-	model "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/model"
+	model "github.com/MAXXXIMUS-tropical-milkshake/drop-audio-streaming/internal/domain/model"
 
 	uuid "github.com/google/uuid"
 )
