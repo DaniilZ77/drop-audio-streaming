@@ -45,6 +45,8 @@ func (s *BeatStore) SaveBeat(ctx context.Context, beat model.SaveBeat) (err erro
 		return err
 	}
 
+	fmt.Println(beat)
+
 	defer tx.Rollback(ctx) // nolint
 
 	qtx := s.Queries.WithTx(tx)

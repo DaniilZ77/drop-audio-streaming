@@ -20,7 +20,7 @@ type (
 		IsFileDownloaded    bool
 		IsImageDownloaded   bool
 		IsArchiveDownloaded bool
-		Bpm                 int
+		Bpm                 int64
 		RangeStart          int64
 		RangeEnd            int64
 		CreatedAt           time.Time
@@ -49,7 +49,7 @@ type (
 		Note         *BeatsNote
 		BeatmakerID  *uuid.UUID
 		BeatName     *string
-		Bpm          *int
+		Bpm          *int64
 		OrderBy      *OrderBy
 		Limit        uint64
 		Offset       uint64
@@ -101,357 +101,247 @@ const (
 	AdminScaleMajor  AdminScale = "major"
 )
 
-func ToModelSaveBeatParams(beat *audiov1.UploadBeatRequest) (*SaveBeat, error) {
-	genres := make([]generated.SaveGenresParams, 0, len(beat.BeatGenre))
-	tags := make([]generated.SaveTagsParams, 0, len(beat.BeatTag))
-	moods := make([]generated.SaveMoodsParams, 0, len(beat.BeatMood))
+func toDomainSaveGenresParams(beatID uuid.UUID, genres []string) ([]generated.SaveGenresParams, error) {
+	var res []generated.SaveGenresParams
+	for _, v := range genres {
+		if genreID, err := uuid.Parse(v); err != nil {
+			return nil, NewErr(ErrInvalidID, "genre id must be uuid")
+		} else {
+			res = append(res, generated.SaveGenresParams{BeatID: beatID, GenreID: genreID})
+		}
+	}
+	return res, nil
+}
 
+func toDomainSaveTagsParams(beatID uuid.UUID, tags []string) ([]generated.SaveTagsParams, error) {
+	var res []generated.SaveTagsParams
+	for _, v := range tags {
+		if tagID, err := uuid.Parse(v); err != nil {
+			return nil, NewErr(ErrInvalidID, "tag id must be uuid")
+		} else {
+			res = append(res, generated.SaveTagsParams{BeatID: beatID, TagID: tagID})
+		}
+	}
+	return res, nil
+}
+
+func toDomainSaveMoodsParams(beatID uuid.UUID, moods []string) ([]generated.SaveMoodsParams, error) {
+	var res []generated.SaveMoodsParams
+	for _, v := range moods {
+		if moodID, err := uuid.Parse(v); err != nil {
+			return nil, NewErr(ErrInvalidID, "mood id must be uuid")
+		} else {
+			res = append(res, generated.SaveMoodsParams{BeatID: beatID, MoodID: moodID})
+		}
+	}
+	return res, nil
+}
+
+func ToDomainSaveBeat(beat *audiov1.UploadBeatRequest) (*SaveBeat, error) {
+	var res SaveBeat
 	beatID, err := uuid.Parse(beat.BeatId)
 	if err != nil {
 		return nil, NewErr(ErrInvalidID, "beat id must be uuid")
 	}
-
 	noteID, err := uuid.Parse(beat.Note.NoteId)
 	if err != nil {
 		return nil, NewErr(ErrInvalidID, "note id must be uuid")
 	}
-
 	beatmakerID, err := uuid.Parse(beat.BeatmakerId)
 	if err != nil {
 		return nil, NewErr(ErrInvalidID, "beatmaker id must be uuid")
 	}
-
-	var id uuid.UUID
-	for _, v := range beat.BeatGenre {
-		if id, err = uuid.Parse(v); err != nil {
-			return nil, NewErr(ErrInvalidID, "genre id must be uuid")
-		}
-		genres = append(genres, generated.SaveGenresParams{
-			GenreID: id,
-			BeatID:  beatID,
-		})
+	res.ID = beatID
+	res.BeatmakerID = beatmakerID
+	res.Name = beat.Name
+	res.Description = beat.Description
+	res.Bpm = int32(beat.Bpm)
+	res.RangeStart = beat.Range.Start
+	res.RangeEnd = beat.Range.End
+	res.Note.BeatID = beatID
+	res.Note.NoteID = noteID
+	res.Note.Scale = generated.NoteScale(beat.Note.Scale)
+	res.Genres, err = toDomainSaveGenresParams(beatID, beat.BeatGenre)
+	if err != nil {
+		return nil, err
 	}
-
-	for _, v := range beat.BeatTag {
-		if id, err = uuid.Parse(v); err != nil {
-			return nil, NewErr(ErrInvalidID, "tag id must be uuid")
-		}
-		tags = append(tags, generated.SaveTagsParams{
-			TagID:  id,
-			BeatID: beatID,
-		})
+	res.Tags, err = toDomainSaveTagsParams(beatID, beat.BeatTag)
+	if err != nil {
+		return nil, err
 	}
-
-	for _, v := range beat.BeatMood {
-		if id, err = uuid.Parse(v); err != nil {
-			return nil, NewErr(ErrInvalidID, "mood id must be uuid")
-		}
-		moods = append(moods, generated.SaveMoodsParams{
-			MoodID: id,
-			BeatID: beatID,
-		})
+	res.Moods, err = toDomainSaveMoodsParams(beatID, beat.BeatMood)
+	if err != nil {
+		return nil, err
 	}
-
-	return &SaveBeat{
-		SaveBeatParams: generated.SaveBeatParams{
-			ID:          beatID,
-			BeatmakerID: beatmakerID,
-			Name:        beat.Name,
-			Description: beat.Description,
-			Bpm:         int32(beat.Bpm),
-			RangeStart:  beat.Range.Start,
-			RangeEnd:    beat.Range.End,
-		},
-		Genres: genres,
-		Tags:   tags,
-		Moods:  moods,
-		Note: generated.SaveNoteParams{
-			BeatID: beatID,
-			NoteID: noteID,
-			Scale:  generated.NoteScale(beat.Note.Scale),
-		},
-	}, nil
+	return &res, nil
 }
 
-func ToModelGetBeatsParams(params *audiov1.GetBeatsRequest) (*GetBeatsParams, error) {
+func ToDomainGetBeatsParams(params *audiov1.GetBeatsRequest) (*GetBeatsParams, error) {
 	var res GetBeatsParams
-
-	var id uuid.UUID
-	var err error
 	if params.BeatId != nil {
-		if id, err = uuid.Parse(*params.BeatId); err != nil {
+		if beatID, err := uuid.Parse(*params.BeatId); err != nil {
 			return nil, NewErr(ErrInvalidID, "beat id must be uuid")
+		} else {
+			res.BeatID = &beatID
 		}
-		beatID := id
-		res.BeatID = &beatID
 	}
-
 	res.Genre = params.Genre
 	res.Mood = params.Mood
 	res.Tag = params.Tag
-
 	if params.Note != nil {
 		res.Note = &BeatsNote{
 			Name:  params.Note.Name,
 			Scale: params.Note.Scale,
 		}
 	}
-
 	if params.BeatmakerId != nil {
-		if id, err = uuid.Parse(*params.BeatmakerId); err != nil {
+		if beatmakerID, err := uuid.Parse(*params.BeatmakerId); err != nil {
 			return nil, NewErr(ErrInvalidID, "beatmaker id must be uuid")
+		} else {
+			res.BeatmakerID = &beatmakerID
 		}
-		beatmakerID := id
-		res.BeatmakerID = &beatmakerID
 	}
-
 	res.BeatName = params.BeatName
-
-	if params.Bpm != nil {
-		bpm := int(*params.Bpm)
-		res.Bpm = &bpm
-	}
-
+	res.Bpm = params.Bpm
 	if params.OrderBy != nil {
 		res.OrderBy = &OrderBy{
 			Order: params.OrderBy.Order,
 			Field: params.OrderBy.Field,
 		}
 	}
-
 	res.Limit = params.Limit
 	res.Offset = params.Offset
-
 	res.IsDownloaded = params.IsDownloaded
-
 	return &res, nil
 }
 
 func ToGetBeatsResponse(beats []Beat, users []*userv1.GetUserResponse, total uint64, params GetBeatsParams) *audiov1.GetBeatsResponse {
-	var res []*audiov1.Beat
+	var res audiov1.GetBeatsResponse
 	for i := range beats {
-		res = append(res, toResponseBeat(beats[i], users[i]))
+		res.Beats = append(res.Beats, toResponseBeat(beats[i], users[i]))
 	}
-
-	return &audiov1.GetBeatsResponse{
-		Beats: res,
-		Pagination: &audiov1.Pagination{
-			Records:        total,
-			RecordsPerPage: params.Limit,
-			Pages:          (total + params.Limit - 1) / params.Limit,
-			CurPage:        params.Offset/params.Limit + 1,
-		},
-	}
+	res.Pagination = &audiov1.Pagination{}
+	res.Pagination.Records = total
+	res.Pagination.RecordsPerPage = params.Limit
+	res.Pagination.Pages = (total + params.Limit - 1) / params.Limit
+	res.Pagination.CurPage = params.Offset/params.Limit + 1
+	return &res
 }
 
 func toResponseBeat(b Beat, u *userv1.GetUserResponse) *audiov1.Beat {
-	scale := generated.NoteScaleMinor
+	var res audiov1.Beat
+	res.Note = &audiov1.GetBeatsNote{}
+	res.Note.Scale = string(generated.NoteScaleMinor)
 	if b.NoteScale != nil && *b.NoteScale == string(generated.NoteScaleMajor) {
-		scale = generated.NoteScaleMajor
+		res.Note.Scale = string(generated.NoteScaleMajor)
 	}
-
-	var name string
 	if b.NoteName != nil {
-		name = *b.NoteName
+		res.Note.Name = *b.NoteName
 	}
-
-	return &audiov1.Beat{
-		BeatId: b.ID.String(),
-		Beatmaker: &audiov1.Beatmaker{
-			Id:        b.BeatmakerID.String(),
-			Username:  u.Username,
-			Pseudonym: u.Pseudonym,
-		},
-		ImageDownloadUrl: b.ImagePath,
-		Name:             b.Name,
-		Description:      b.Description,
-		Genre:            b.Genres,
-		Tag:              b.Tags,
-		Mood:             b.Moods,
-		Note: &audiov1.GetBeatsNote{
-			Name:  name,
-			Scale: string(scale),
-		},
-		Bpm: int64(b.Bpm),
-		Range: &audiov1.Range{
-			Start: b.RangeStart,
-			End:   b.RangeEnd,
-		},
-		IsFileUploaded:    b.IsFileDownloaded,
-		IsImageUploaded:   b.IsImageDownloaded,
-		IsArchiveUploaded: b.IsArchiveDownloaded,
-		CreatedAt:         timestamppb.New(b.CreatedAt),
-	}
+	res.BeatId = b.ID.String()
+	res.Beatmaker = &audiov1.Beatmaker{}
+	res.Beatmaker.Id = b.BeatmakerID.String()
+	res.Beatmaker.Pseudonym = u.Pseudonym
+	res.Beatmaker.Username = u.Username
+	res.ImageDownloadUrl = b.ImagePath
+	res.Name = b.Name
+	res.Description = b.Description
+	res.Genre = b.Genres
+	res.Tag = b.Tags
+	res.Mood = b.Moods
+	res.Bpm = b.Bpm
+	res.Range = &audiov1.Range{}
+	res.Range.Start = b.RangeStart
+	res.Range.End = b.RangeEnd
+	res.IsFileUploaded = b.IsFileDownloaded
+	res.IsImageUploaded = b.IsImageDownloaded
+	res.IsArchiveUploaded = b.IsArchiveDownloaded
+	res.CreatedAt = timestamppb.New(b.CreatedAt)
+	return &res
 }
 
 func ToGetBeatParamsResponse(b BeatAttributes) *audiov1.GetBeatParamsResponse {
-	genres := make([]*audiov1.GenreParam, 0, len(b.Genres))
-	tags := make([]*audiov1.TagParam, 0, len(b.Tags))
-	moods := make([]*audiov1.MoodParam, 0, len(b.Moods))
-	notes := make([]*audiov1.NoteParam, 0, len(b.Notes))
-
+	var res audiov1.GetBeatParamsResponse
 	for _, v := range b.Genres {
-		genres = append(genres, &audiov1.GenreParam{
-			GenreId: v.ID.String(),
-			Name:    v.Name,
-		})
+		res.Genres = append(res.Genres, &audiov1.GenreParam{GenreId: v.ID.String(), Name: v.Name})
 	}
-
 	for _, v := range b.Tags {
-		tags = append(tags, &audiov1.TagParam{
-			TagId: v.ID.String(),
-			Name:  v.Name,
-		})
+		res.Tags = append(res.Tags, &audiov1.TagParam{TagId: v.ID.String(), Name: v.Name})
 	}
-
 	for _, v := range b.Moods {
-		moods = append(moods, &audiov1.MoodParam{
-			MoodId: v.ID.String(),
-			Name:   v.Name,
-		})
+		res.Moods = append(res.Moods, &audiov1.MoodParam{MoodId: v.ID.String(), Name: v.Name})
 	}
-
 	for _, v := range b.Notes {
-		notes = append(notes, &audiov1.NoteParam{
-			NoteId: v.ID.String(),
-			Name:   v.Name,
-		})
+		res.Notes = append(res.Notes, &audiov1.NoteParam{NoteId: v.ID.String(), Name: v.Name})
 	}
-
-	return &audiov1.GetBeatParamsResponse{
-		Genres: genres,
-		Tags:   tags,
-		Moods:  moods,
-		Notes:  notes,
-	}
+	return &res
 }
 
-func ToModelUpdateBeatParams(req *audiov1.UpdateBeatRequest) (*UpdateBeat, error) {
-	var genres []generated.SaveGenresParams
-	var tags []generated.SaveTagsParams
-	var moods []generated.SaveMoodsParams
-
+func ToDomainUpdateBeat(req *audiov1.UpdateBeatRequest) (*UpdateBeat, error) {
+	var res UpdateBeat
 	beatID, err := uuid.Parse(req.BeatId)
 	if err != nil {
 		return nil, NewErr(ErrInvalidID, "beat id must be uuid")
 	}
-
-	var id uuid.UUID
-	for _, v := range req.BeatGenre {
-		if id, err = uuid.Parse(v); err != nil {
-			return nil, NewErr(ErrInvalidID, "genre id must be uuid")
-		}
-		genres = append(genres, generated.SaveGenresParams{
-			GenreID: id,
-			BeatID:  beatID,
-		})
+	res.ID = beatID
+	res.Genres, err = toDomainSaveGenresParams(beatID, req.BeatGenre)
+	if err != nil {
+		return nil, err
 	}
-
-	for _, v := range req.BeatTag {
-		if id, err = uuid.Parse(v); err != nil {
-			return nil, NewErr(ErrInvalidID, "tag id must be uuid")
-		}
-		tags = append(tags, generated.SaveTagsParams{
-			TagID:  id,
-			BeatID: beatID,
-		})
+	res.Tags, err = toDomainSaveTagsParams(beatID, req.BeatTag)
+	if err != nil {
+		return nil, err
 	}
-
-	for _, v := range req.BeatMood {
-		if id, err = uuid.Parse(v); err != nil {
-			return nil, NewErr(ErrInvalidID, "mood id must be uuid")
-		}
-		moods = append(moods, generated.SaveMoodsParams{
-			MoodID: id,
-			BeatID: beatID,
-		})
+	res.Moods, err = toDomainSaveMoodsParams(beatID, req.BeatMood)
+	if err != nil {
+		return nil, err
 	}
-
-	var note *generated.SaveNoteParams
 	if req.Note != nil {
-		if id, err = uuid.Parse(req.Note.NoteId); err != nil {
+		if noteID, err := uuid.Parse(req.Note.NoteId); err != nil {
 			return nil, NewErr(ErrInvalidID, "note id must be uuid")
+		} else {
+			res.Note = &generated.SaveNoteParams{}
+			res.Note.BeatID = beatID
+			res.Note.NoteID = noteID
+			res.Note.Scale = generated.NoteScale(req.Note.Scale)
 		}
-		note = &generated.SaveNoteParams{
-			BeatID: beatID,
-			NoteID: id,
-			Scale:  generated.NoteScale(req.Note.Scale),
-		}
 	}
-
-	var name *string
-	if req.Name != nil {
-		name = req.Name
-	}
-
-	var description *string
-	if req.Description != nil {
-		description = req.Description
-	}
-
-	var bpm *int32
+	res.Name = req.Name
+	res.Description = req.Description
 	if req.Bpm != nil {
 		tmp := int32(*req.Bpm)
-		bpm = &tmp
+		res.Bpm = &tmp
 	}
-
-	var isImageDownloaded *bool
 	if req.UpdateImage != nil && *req.UpdateImage {
 		tmp := false
-		isImageDownloaded = &tmp
+		res.IsImageDownloaded = &tmp
 	}
-
-	var isFileDownloaded *bool
 	if req.UpdateFile != nil && *req.UpdateFile {
 		tmp := false
-		isFileDownloaded = &tmp
+		res.IsFileDownloaded = &tmp
 	}
-
-	var isArchiveDownloaded *bool
 	if req.UpdateArchive != nil && *req.UpdateArchive {
 		tmp := false
-		isArchiveDownloaded = &tmp
+		res.IsArchiveDownloaded = &tmp
 	}
-
-	var rangeStart, rangeEnd *int64
 	if req.Range != nil {
-		rangeStart = &req.Range.Start
-		rangeEnd = &req.Range.End
+		res.RangeStart = &req.Range.Start
+		res.RangeEnd = &req.Range.End
 	}
-
-	return &UpdateBeat{
-		UpdateBeatParams: generated.UpdateBeatParams{
-			ID:                  beatID,
-			Name:                name,
-			Description:         description,
-			Bpm:                 bpm,
-			IsImageDownloaded:   isImageDownloaded,
-			IsFileDownloaded:    isFileDownloaded,
-			IsArchiveDownloaded: isArchiveDownloaded,
-			RangeStart:          rangeStart,
-			RangeEnd:            rangeEnd,
-		},
-		Genres: genres,
-		Moods:  moods,
-		Tags:   tags,
-		Note:   note,
-	}, nil
+	return &res, nil
 }
 
-func ToModelGetArchiveParams(req *audiov1.AcquireBeatRequest) (*generated.SaveOwnerParams, error) {
-	var beatID, userID uuid.UUID
-	var err error
-
-	if beatID, err = uuid.Parse(req.BeatId); err != nil {
+func ToDomainSaveOwnerParams(req *audiov1.AcquireBeatRequest) (*generated.SaveOwnerParams, error) {
+	var res generated.SaveOwnerParams
+	beatID, err := uuid.Parse(req.BeatId)
+	if err != nil {
 		return nil, NewErr(ErrInvalidID, "beat id must be uuid")
 	}
-
-	if userID, err = uuid.Parse(req.UserId); err != nil {
+	res.BeatID = beatID
+	userID, err := uuid.Parse(req.UserId)
+	if err != nil {
 		return nil, NewErr(ErrInvalidID, "user id must be uuid")
 	}
-
-	return &generated.SaveOwnerParams{
-		BeatID: beatID,
-		UserID: userID,
-	}, nil
+	res.UserID = userID
+	return &res, nil
 }

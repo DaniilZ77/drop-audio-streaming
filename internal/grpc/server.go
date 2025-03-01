@@ -70,7 +70,7 @@ func (s *server) GetBeats(ctx context.Context, req *audiov1.GetBeatsRequest) (*a
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	params, err := model.ToModelGetBeatsParams(req)
+	params, err := model.ToDomainGetBeatsParams(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -99,7 +99,7 @@ func (s *server) UploadBeat(ctx context.Context, req *audiov1.UploadBeatRequest)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	beat, err := model.ToModelSaveBeatParams(req)
+	beat, err := model.ToDomainSaveBeat(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -146,7 +146,7 @@ func (s *server) UpdateBeat(ctx context.Context, req *audiov1.UpdateBeatRequest)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	params, err := model.ToModelUpdateBeatParams(req)
+	params, err := model.ToDomainUpdateBeat(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -175,7 +175,7 @@ func (s *server) AcquireBeat(ctx context.Context, req *audiov1.AcquireBeatReques
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	params, err := model.ToModelGetArchiveParams(req)
+	params, err := model.ToDomainSaveOwnerParams(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
